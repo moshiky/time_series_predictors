@@ -1,0 +1,9 @@
+
+class Consts:
+
+    TEST_SIZE_FACTOR = 0.25
+
+    MIN_RECORD_LENGTH = (1 / TEST_SIZE_FACTOR) * 4
+
+    MEAN_ERROR_LOG_INTERVAL = 500
+
