@@ -1,4 +1,6 @@
 
+import os
+import matplotlib.pylab as plt
 from datetime import datetime, timedelta
 import csv
 
@@ -184,6 +186,10 @@ class CourseraParser:
                 course_posts[course_id] = [list(record)]
         print('found {num_courses} courses'.format(num_courses=len(course_posts.keys())))
 
+        # create csv headers
+        timepiece_headers = CourseraParser.get_timepiece_headers()
+        csv_headers = ['course_id'] + timepiece_headers
+
         # produce csv for each course
         csv_lines = list()
         for course_id in course_posts.keys():
@@ -195,11 +201,25 @@ class CourseraParser:
             csv_row = [course_id] + total_posts_by_relative_timepiece
             csv_lines.append(csv_row)
 
-        CourseraParser.save_as_csv(
-            r'output/total_posts_per_timepiece.csv', csv_lines, ['course_id'] + CourseraParser.get_timepiece_headers()
-        )
+            # save course chart
+            file_name = 'posts_over_time_course_{course_id}.png'.format(course_id=course_id)
+            CourseraParser.save_chart(file_name, timepiece_headers, total_posts_by_relative_timepiece)
+
+        # CourseraParser.save_as_csv(
+        #     r'output/total_posts_per_timepiece.csv', csv_lines, csv_headers
+        # )
 
         print('done')
+
+    @staticmethod
+    def save_chart(file_name, x_values, y_values):
+        # create chart name
+        chart_file_name = os.path.join(r'output/graphs', file_name)
+
+        plt.clf()
+        plt.plot(x_values, y_values)
+        plt.savefig(fname=chart_file_name)
+        plt.clf()
 
     @staticmethod
     def get_normalized_course_graph(course_records):
