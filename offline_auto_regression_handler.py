@@ -1,6 +1,4 @@
 
-from statsmodels.tsa.ar_model import AR
-import numpy as np
 from numpy.linalg import lstsq
 
 
@@ -24,6 +22,9 @@ class OfflineAutoRegressionHandler:
 
         # find params
         self.__params = lstsq(x_values, y_values)[0]
+
+        # print params
+        self.__logger.log('model params: {params}'.format(params=self.__params))
 
     def predict_using_learned_params(self, initial_values, prediction_length):
         if len(initial_values) < self.__window_size:
