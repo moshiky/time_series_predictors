@@ -116,22 +116,73 @@ def run_offline_predictors(logger_p, records, predictor_class_list):
     return predictor_mean_error
 
 
+def run_online_predictors(logger_p, records, predictor_class_list):
+    # init error storage
+    predictor_errors = dict()
+
+    # predict with each predictor
+    for predictor_class_info in predictor_class_list:
+        # create instance
+        predictor_class = predictor_class_info[0]
+        window_size = predictor_class_info[1]
+        predictor_class_name = predictor_class.__name__
+
+        # init error list
+        predictor_errors[predictor_class_name] = list()
+
+        # predict test set
+        record_index = 0
+        for record in records:
+            # split to train and test samples
+            train_samples = record[:Consts.NUMBER_OF_INITIAL_VALUES_FOR_ONLINE]
+            test_samples = record[Consts.NUMBER_OF_INITIAL_VALUES_FOR_ONLINE:]
+
+            if len(train_samples) < window_size:
+                logger_p.log('Warning: series too short. '
+                             'length: {series_length} class: {class_name} window size: {window_size}'.format(
+                                series_length=len(record), class_name=predictor_class_name, window_size=window_size))
+                continue
+
+            # create predictor
+            predictor = predictor_class(logger_p, train_samples, window_size)
+
+            # predict values
+            predicted_values = list()
+            next_value = predictor.predict_next()
+            for series_value in test_samples:
+                predicted_values.append(next_value)
+                predictor.update_predictor(series_value)
+                next_value = predictor.predict_next()
+
+            # store graph
+            draw_prediction_graph(record, predicted_values, predictor_class_name, record_index)
+
+            # store error
+            predictor_errors[predictor_class_name].append(
+                calculate_mean_error(test_samples, predicted_values)
+            )
+
+            # increase record index
+            record_index += 1
+
+    # calculate mean error for each predictor
+    predictor_mean_error = {
+        predictor_name: float(sum(predictor_errors[predictor_name])) / len(predictor_errors[predictor_name])
+        for predictor_name in predictor_errors.keys()
+    }
+
+    # return mean error log
+    return predictor_mean_error
+
+
 def main(file_path, logger_p):
 
     # read input file - returns list of lists
     data_records = parse_csv(file_path)
     logger_p.log('{num_records} records loaded'.format(num_records=len(data_records)))
 
-    # set predictors list
-    predictor_classes = [
-        OfflineAutoRegressionHandler,
-        # OnlineAutoRegressionHandler,
-        # MovingAverageHandler,
-        # WeightedMovingAverageHandler,
-    ]
-
     # run offline predictors
-    predictor_errors = \
+    offline_predictor_errors = \
         run_offline_predictors(
             logger_p,
             data_records,
@@ -139,7 +190,18 @@ def main(file_path, logger_p):
                 (OfflineAutoRegressionHandler, 1),
             ]
         )
-    logger_p.log(predictor_errors)
+    logger_p.log(offline_predictor_errors)
+
+    # run offline predictors
+    online_predictor_errors = \
+        run_online_predictors(
+            logger_p,
+            data_records,
+            [
+                (OnlineAutoRegressionHandler, 1),
+            ]
+        )
+    logger_p.log(online_predictor_errors)
 
     # # initiate mean error lists
     # mean_error_log = dict()

@@ -9,7 +9,7 @@ class OfflineAutoRegressionHandler:
         self.__window_size = window_size
         self.__params = None
 
-    def learn_model_params(self, train_set):
+    def learn_model_params(self, train_set, should_print_params=True):
         # build x list
         x_values = list()
         for row in train_set:
@@ -24,7 +24,8 @@ class OfflineAutoRegressionHandler:
         self.__params = lstsq(x_values, y_values)[0]
 
         # print params
-        self.__logger.log('model params: {params}'.format(params=self.__params))
+        if should_print_params:
+            self.__logger.log('model params: {params}'.format(params=self.__params))
 
     def predict_using_learned_params(self, initial_values, prediction_length):
         if len(initial_values) < self.__window_size:
