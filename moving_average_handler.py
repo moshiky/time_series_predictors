@@ -1,7 +1,7 @@
 
 class MovingAverageHandler:
 
-    def __init__(self, logger, train_values, window_size=1):
+    def __init__(self, logger, train_values, window_size=2):
         self.__logger = logger
         self.__history = list(train_values)
         self.__window_size = window_size
