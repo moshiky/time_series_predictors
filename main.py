@@ -2,6 +2,7 @@
 import sys
 import os
 import matplotlib.pylab as plt
+from scipy import stats
 from sklearn.metrics import mean_squared_error
 from utils import parse_csv, split_list
 from online_auto_regression_handler import OnlineAutoRegressionHandler
@@ -14,11 +15,15 @@ from consts import Consts
 
 def calculate_mean_error(test_samples, predictions):
     # Mean Squared Error (MSE)
-    mean_error = mean_squared_error(test_samples, predictions)
+    # mean_error = mean_squared_error(test_samples, predictions)
 
     # # Mean Absolute Percentage Error (MAPE)
     # errors = [float(abs(test_samples[i]-predictions[i]))/max(test_samples[i], 1) for i in range(len(test_samples))]
     # mean_error = float(sum(errors))/len(errors)
+
+    # R^2 - Coefficient of determination
+    slope, intercept, r_value, p_value, std_err = stats.linregress(test_samples, predictions)
+    mean_error = r_value ** 2
 
     return mean_error
 
@@ -63,6 +68,9 @@ def draw_prediction_graph(original_data, predicted_values, predictor_name, recor
 
 
 def run_offline_predictors(logger_p, records, predictor_class_list):
+    # prompt start
+    logger_p.log('-- running offline predictors')
+
     # split to train and test
     train_records, test_records = split_list(records)
 
@@ -76,6 +84,9 @@ def run_offline_predictors(logger_p, records, predictor_class_list):
         window_size = predictor_class_info[1]
         predictor_class_name = predictor_class.__name__
         predictor = predictor_class(logger_p, window_size)
+
+        # prompt predictor start
+        logger_p.log('- running predictor: {predictor_name}'.format(predictor_name=predictor_class_name))
 
         # init error list
         predictor_errors[predictor_class_name] = list()
@@ -92,15 +103,19 @@ def run_offline_predictors(logger_p, records, predictor_class_list):
                                 series_length=len(record), class_name=predictor_class_name, window_size=window_size))
                 continue
 
+            # log record index
+            if record_index % Consts.RECORD_LOG_INTERVAL == 0:
+                logger_p.log('record #{record_index}'.format(record_index=record_index))
+
             # predict values
             predicted_values = predictor.predict_using_learned_params(record[:window_size], len(record)-window_size)
 
             # store graph
-            draw_prediction_graph(record, predicted_values, predictor_class_name, record_index)
+            # draw_prediction_graph(record, predicted_values, predictor_class_name, record_index)
 
             # store error
             predictor_errors[predictor_class_name].append(
-                calculate_mean_error(record[window_size:], predicted_values)
+                calculate_mean_error(record[-len(predicted_values):], predicted_values)
             )
 
             # increase record index
@@ -117,6 +132,9 @@ def run_offline_predictors(logger_p, records, predictor_class_list):
 
 
 def run_online_predictors(logger_p, records, predictor_class_list):
+    # prompt start
+    logger_p.log('-- running online predictors')
+
     # init error storage
     predictor_errors = dict()
 
@@ -126,6 +144,9 @@ def run_online_predictors(logger_p, records, predictor_class_list):
         predictor_class = predictor_class_info[0]
         window_size = predictor_class_info[1]
         predictor_class_name = predictor_class.__name__
+
+        # prompt predictor start
+        logger_p.log('- running predictor: {predictor_name}'.format(predictor_name=predictor_class_name))
 
         # init error list
         predictor_errors[predictor_class_name] = list()
@@ -143,6 +164,10 @@ def run_online_predictors(logger_p, records, predictor_class_list):
                                 series_length=len(record), class_name=predictor_class_name, window_size=window_size))
                 continue
 
+            # log record index
+            if record_index % Consts.RECORD_LOG_INTERVAL == 0:
+                logger_p.log('record #{record_index}'.format(record_index=record_index))
+
             # create predictor
             predictor = predictor_class(logger_p, train_samples, window_size)
 
@@ -155,7 +180,7 @@ def run_online_predictors(logger_p, records, predictor_class_list):
                 next_value = predictor.predict_next()
 
             # store graph
-            draw_prediction_graph(record, predicted_values, predictor_class_name, record_index)
+            # draw_prediction_graph(record, predicted_values, predictor_class_name, record_index)
 
             # store error
             predictor_errors[predictor_class_name].append(
@@ -190,7 +215,6 @@ def main(file_path, logger_p):
                 (OfflineAutoRegressionHandler, 1),
             ]
         )
-    logger_p.log(offline_predictor_errors)
 
     # run offline predictors
     online_predictor_errors = \
@@ -201,65 +225,13 @@ def main(file_path, logger_p):
                 (OnlineAutoRegressionHandler, 1),
             ]
         )
-    logger_p.log(online_predictor_errors)
 
-    # # initiate mean error lists
-    # mean_error_log = dict()
-    # for predictor_class in predictor_classes:
-    #     mean_error_log[predictor_class.__name__] = list()
-    #
-    # record_index = 0
-    # for record in data_records:
-    #     if record_index % Consts.LOG_INTERVAL == 0:
-    #         logger_p.log('-- record #{record_index} --'.format(record_index=record_index))
-    #
-    #     # split to train and test sets
-    #     train_samples, test_samples = split_list(record)
-    #     predictions_of_each_predictor = dict()
-    #
-    #     # calculate mean error for each info record
-    #     for predictor_class in predictor_classes:
-    #         predictor_class_name = predictor_class.__name__
-    #
-    #         try:
-    #             record_mean_error, predictions = \
-    #                 calculate_average_me_with_predictor(logger_p, predictor_class, train_samples, test_samples)
-    #         except Exception as ex:
-    #             logger_p.error('problematic record: ' + str(record))
-    #             logger_p.error('predictor: {predictor_name}'.format(predictor_name=predictor_class_name))
-    #             logger_p.error('error: {ex}'.format(ex=ex))
-    #             continue
-    #
-    #         mean_error_log[predictor_class_name].append(record_mean_error)
-    #
-    #         # collect prediction data
-    #         predictions_of_each_predictor[predictor_class_name] = predictions
-    #
-    #         if record_index % Consts.LOG_INTERVAL == 0:
-    #             logger_p.log('{predictor_class_name} >> current avg. error = {avg_error}'.format(
-    #                     predictor_class_name=predictor_class_name,
-    #                     avg_error=float(sum(mean_error_log[predictor_class_name])) /
-    #                               len(mean_error_log[predictor_class_name])
-    #                 )
-    #             )
-    #
-    #     # draw predictions vs. original data
-    #     draw_prediction_graph(predictions_of_each_predictor, record_index, train_samples, test_samples)
-    #
-    #     record_index += 1
-    #
-    # # print final stats
-    # logger_p.log('== final stats ==')
-    # for predictor_class in predictor_classes:
-    #     predictor_class_name = predictor_class.__name__
-    #     logger_p.log('{predictor_class_name} >> final avg. error = {avg_error}'.format(
-    #             predictor_class_name=predictor_class_name,
-    #             avg_error=float(sum(mean_error_log[predictor_class_name])) /
-    #                         max(len(mean_error_log[predictor_class_name]), 1)
-    #         )
-    #     )
+    # log results
+    logger_p.log('R^2 values:')
+    logger_p.log(offline_predictor_errors)
+    logger_p.log(online_predictor_errors)
 
 
 if __name__ == '__main__':
     logger = Logger()
-    main(r'datasets/ar2.csv', logger)
+    main(r'datasets/author_h_index.csv', logger)

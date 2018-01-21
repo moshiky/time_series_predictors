@@ -7,6 +7,8 @@ class Consts:
 
     MIN_RECORD_LENGTH = 1
 
-    LOG_INTERVAL = 10
+    RECORD_LOG_INTERVAL = 100
 
     JUSTIFICATION_LENGTH = 5
+
+    YEARS_AHEAD = 5
