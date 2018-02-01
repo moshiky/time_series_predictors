@@ -1,128 +1,122 @@
-import requests, pandas as pd, numpy as np
-from pandas import DataFrame
-from io import StringIO
-import time, json
-from datetime import date
-import statsmodels
-from statsmodels.tsa.stattools import adfuller, acf, pacf
+from pandas import datetime
+from matplotlib import pyplot
 from statsmodels.tsa.arima_model import ARIMA
-from statsmodels.tsa.seasonal import seasonal_decompose
 from sklearn.metrics import mean_squared_error
-import matplotlib.pylab as plt
+from utils import parse_csv
 
-from matplotlib.pylab import rcParams
+
+def parser(x):
+    return datetime.strptime('190' + x, '%Y-%m')
+
+
+class ARIMA_model:
+
+    def __init__(self, p=0, d=0, q=0):
+        # set AR component order
+        self.__p = p
+
+        # set MA component order
+        self.__q = q
+
+        # set I component order
+        self.__d = d
+
+    def predict(self, X, record_id, should_plot=False):
+        size = int(len(X) * 0.66)
+        train, test = X[0:size], X[size:len(X)]
+        history = [x for x in train]
+        predictions = list()
+        for t in range(len(test)):
+            model = ARIMA(history, order=(self.__p, self.__d, self.__q))
+            model_fit = model.fit(disp=0, trend='nc')
+            output = model_fit.forecast()
+            yhat = output[0]
+            predictions.append(yhat)
+            obs = test[t]
+            history.append(obs)
+            # print('predicted=%f, expected=%f' % (yhat, obs))
+        error = mean_squared_error(test, predictions)
+        print('Test MSE: %.3f' % error)
+        if should_plot:
+            # plot
+            pyplot.clf()
+            pyplot.plot(test)
+            pyplot.plot(predictions, color='red')
+            pyplot.savefig(
+                r'output/arima__id_{record_id}_p_{p}_d_{d}_q_{q}.png'
+                .format(record_id=record_id, p=self.__p, d=self.__d, q=self.__q)
+            )
+
+        return error
 
 
 def main():
-    rcParams['figure.figsize'] = 15, 6
+    # read series data
+    # read input file - returns list of lists
+    file_path = r'datasets/author_h_index.csv'
+    data_records = parse_csv(file_path)
 
-    df_fx_data = pd.read_csv(r'datasets/BOE-XUDLERD.csv')
-    df_fx_data['Date'] = pd.to_datetime(df_fx_data['Date'], format='%Y-%m-%d')
-    indexed_df = df_fx_data.set_index('Date')
+    # define min error storage
+    record_min_error_params = dict()
 
-    ts = indexed_df['Value']
-    # print(ts.head(5))
+    # initiate problematic records storage
+    problematic_records = list()
 
-    # plt.plot(ts.index.to_pydatetime(), ts.values, color='red')
-    # print(len(ts.values))
-    # plt.show()
+    # make predictions for each record
+    for i in range(len(data_records)):
+        print('=== record #{record_index} ==='.format(record_index=i))
+        X = data_records[i]
 
-    # -- #1
-    ts_week = ts.resample('W').mean()
-    # print(len(ts_week.values))
-    # plt.plot(ts_week.index.to_pydatetime(), ts_week.values, color='blue')
-    # plt.show()
+        # define max value to search
+        max_value = 3
 
-    # test_stationarity(ts_week)
+        # initiate performance storage
+        min_error = None
+        min_error_params = None
 
-    # -- #2
-    ts_week_log = np.log(ts_week)
-    # test_stationarity(ts_week_log)
+        # compare p-q values combinations
+        for p_val in range(0, max_value):
+            # compare q values
+            for q_val in range(0, max_value):
+                # verify at least one parameter is greater than zero
+                if p_val + q_val == 0:
+                    continue
 
-    # -- #3
-    decomposition = seasonal_decompose(ts_week)
+                # run ARMA model
+                arma_model = ARIMA_model(p=p_val, q=q_val)
+                print('>> ARMA(p={p}, q={q})'.format(p=p_val, q=q_val))
+                try:
+                    prediction_error = arma_model.predict(X, i)
+                except Exception as ex:
+                    print(ex)
+                    continue
 
-    trend = decomposition.trend
-    seasonal = decomposition.seasonal
-    residual = decomposition.resid
+                params_string = '{p}_{q}'.format(p=p_val, q=q_val)
+                if min_error is None or prediction_error < min_error:
+                    min_error = prediction_error
+                    min_error_params = params_string
 
-    ts_week_log_select = ts_week_log[-80:]
+        # store min error info
+        record_min_error_params['record_{i}'.format(i=i)] = [min_error_params, min_error]
+        print('record best: ', min_error_params, min_error)
 
-    # plt.subplot(411)
-    # plt.plot(ts_week_log_select.index.to_pydatetime(), ts_week_log_select.values, label='Original')
-    # plt.legend(loc='best')
-    # plt.subplot(412)
-    # plt.plot(ts_week_log_select.index.to_pydatetime(), trend[-80:].values, label='Trend')
-    # plt.legend(loc='best')
-    # plt.subplot(413)
-    # plt.plot(ts_week_log_select.index.to_pydatetime(), seasonal[-80:].values, label='Seasonality')
-    # plt.legend(loc='best')
-    # plt.subplot(414)
-    # plt.plot(ts_week_log_select.index.to_pydatetime(), residual[-80:].values, label='Residuals')
-    # plt.legend(loc='best')
-    # plt.tight_layout()
-    # plt.show()
+        if min_error is not None:
+            # plot using min error params
+            p_val, q_val = min_error_params.split('_')
+            arma_model = ARIMA_model(p=int(p_val), q=int(q_val))
+            arma_model.predict(X, i, should_plot=True)
+        else:
+            # add record id to problematic records
+            problematic_records.append(i)
 
-    ts_week_log_diff = ts_week_log - ts_week_log.shift()
-    # plt.plot(ts_week_log_diff.index.to_pydatetime(), ts_week_log_diff.values)
-    # plt.show()
+    # print all errors
+    print(record_min_error_params)
 
-    ts_week_log_diff.dropna(inplace=True)
-    # test_stationarity(ts_week_log_diff)
-
-    # -- determine ARMA params using plots
-
-    # ACF and PACF plots
-    # lag_acf = acf(ts_week_log_diff, nlags=10)
-    # lag_pacf = pacf(ts_week_log_diff, nlags=10, method='ols')
-    #
-    # # Plot ACF:
-    # plt.subplot(121)
-    # plt.plot(lag_acf)
-    # plt.axhline(y=0, linestyle='--', color='gray')
-    # plt.axhline(y=-1.96 / np.sqrt(len(ts_week_log_diff)), linestyle='--', color='gray')
-    # plt.axhline(y=1.96 / np.sqrt(len(ts_week_log_diff)), linestyle='--', color='gray')
-    # plt.title('Autocorrelation Function')
-    #
-    # # Plot PACF:
-    # plt.subplot(122)
-    # plt.plot(lag_pacf)
-    # plt.axhline(y=0, linestyle='--', color='gray')
-    # plt.axhline(y=-1.96 / np.sqrt(len(ts_week_log_diff)), linestyle='--', color='gray')
-    # plt.axhline(y=1.96 / np.sqrt(len(ts_week_log_diff)), linestyle='--', color='gray')
-    # plt.title('Partial Autocorrelation Function')
-    # plt.tight_layout()
-    # plt.show()
-
-    # build ARMA model
-    model = ARIMA(ts_week_log, order=(2, 1, 1))
-    results_ARIMA = model.fit(disp=-1)
-    plt.plot(ts_week_log_diff.index.to_pydatetime(), ts_week_log_diff.values)
-    plt.plot(ts_week_log_diff.index.to_pydatetime(), results_ARIMA.fittedvalues, color='red')
-    plt.title('RSS: %.4f' % sum((results_ARIMA.fittedvalues - ts_week_log_diff) ** 2))
-    plt.show()
-
-
-def test_stationarity(timeseries):
-    # Determing rolling statistics
-    rolmean = timeseries.rolling(window=52, center=False).mean()
-    rolstd = timeseries.rolling(window=52, center=False).std()
-
-    # Plot rolling statistics:
-    orig = plt.plot(timeseries.index.to_pydatetime(), timeseries.values, color='blue', label='Original')
-    mean = plt.plot(rolmean.index.to_pydatetime(), rolmean.values, color='red', label='Rolling Mean')
-    std = plt.plot(rolstd.index.to_pydatetime(), rolstd.values, color='black', label='Rolling Std')
-    plt.legend(loc='best')
-    plt.title('Rolling Mean & Standard Deviation')
-    plt.show()
-
-    # Perform Dickey-Fuller test:
-    print('Results of Dickey-Fuller Test:')
-    dftest = adfuller(timeseries, autolag='AIC')
-    dfoutput = pd.Series(dftest[0:4], index=['Test Statistic', 'p-value', '#Lags Used', 'Number of Observations Used'])
-    for key, value in dftest[4].items():
-        dfoutput['Critical Value (%s)' % key] = value
-    print(dfoutput)
+    # print min error info
+    all_errors = [x[1] for x in record_min_error_params.values()]
+    print('min error: ', min(all_errors))
+    print('avg error: ', sum(all_errors)/len(all_errors))
+    print('problematic records: ', problematic_records)
 
 
 if __name__ == '__main__':
