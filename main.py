@@ -1,6 +1,7 @@
 
 import sys
 import os
+import numpy as np
 import matplotlib.pylab as plt
 from scipy import stats
 from sklearn.metrics import mean_squared_error
@@ -76,6 +77,7 @@ def run_offline_predictors(logger_p, records, predictor_class_list):
 
     # init error storage
     predictor_errors = dict()
+    # predictor_errors_gd = dict()
 
     # predict with each predictor
     for predictor_class_info in predictor_class_list:
@@ -83,19 +85,69 @@ def run_offline_predictors(logger_p, records, predictor_class_list):
         predictor_class = predictor_class_info[0]
         window_size = predictor_class_info[1]
         predictor_class_name = predictor_class.__name__
-        predictor = predictor_class(logger_p, window_size)
 
         # prompt predictor start
         logger_p.log('- running predictor: {predictor_name}'.format(predictor_name=predictor_class_name))
 
+        # create predictor instance
+        predictor = predictor_class(logger_p, window_size)
+
+        # init model params with train set
+        # predictor.learn_model_params(train_records)
+        # avg_params = np.zeros(window_size + 1)
+        # record_count = 0.0
+        # for record in train_records:
+        #     record_params = MovingAverageHandler.test_gd_one_param(record, window_size)
+        #     avg_params = (avg_params * record_count + record_params) / (record_count+1)
+        #     record_count += 1
+        #
+        # # predict
+        # avg_arror = 0.0
+        # for record in test_records:
+        #     record_params = MovingAverageHandler.test_gd_one_param(record, window_size)
+        #     avg_params = (avg_params * record_count + record_params) / (record_count + 1)
+        #     record_count += 1
+
+        # train
+        model_list = list()
+        for i in range(len(train_records[:400])):
+            # create predictor instance
+            predictor = predictor_class(logger_p, window_size)
+
+            # init model params with train set
+            predictor.learn_model_params(train_records[i])
+
+            # store model
+            model_list.append(predictor)
+
+            # print progress
+            if (i % 100) == 0:
+                print('record:', i)
+
+        # calculate average params
+        avg_params = [0.0] * window_size
+        number_of_models = len(model_list)
+        for model in model_list:
+            model_params = model.get_model_params()
+            for i in range(window_size):
+                avg_params[i] += model_params[i]
+        avg_params = [float(x)/number_of_models for x in avg_params]
+
+        # select closest model to average
+        min_error = None
+        best_model = None
+        for model in model_list:
+            model_params = model.get_model_params()
+            error = sum([(avg_params[i]-model_params[i])**2 for i in range(window_size)])
+            if min_error is None or error < min_error:
+                min_error = error
+                best_model = model
+
         # init error list
         predictor_errors[predictor_class_name] = list()
 
-        # init model params with train set
-        predictor.learn_model_params(train_records)
-
         # predict test set
-        record_index = 0
+        record_count = 0
         for record in test_records:
             if len(record) < window_size:
                 logger_p.log('Warning: series too short. '
@@ -104,11 +156,12 @@ def run_offline_predictors(logger_p, records, predictor_class_list):
                 continue
 
             # log record index
-            if record_index % Consts.RECORD_LOG_INTERVAL == 0:
-                logger_p.log('record #{record_index}'.format(record_index=record_index))
+            if record_count % Consts.RECORD_LOG_INTERVAL == 0:
+                logger_p.log('record #{record_index}'.format(record_index=record_count))
 
             # predict values
-            predicted_values = predictor.predict_using_learned_params(record[:window_size], len(record)-window_size)
+            # predicted_values = predictor.predict_using_learned_params(record[:window_size], len(record)-window_size)
+            predicted_values = best_model.predict_using_learned_params(record[:window_size], len(record) - window_size)
 
             # store graph
             # draw_prediction_graph(record, predicted_values, predictor_class_name, record_index)
@@ -117,15 +170,25 @@ def run_offline_predictors(logger_p, records, predictor_class_list):
             predictor_errors[predictor_class_name].append(
                 calculate_mean_error(record[-len(predicted_values):], predicted_values)
             )
+            # predictor_errors_gd[predictor_class_name].append(
+            #     calculate_mean_error(record[-len(predicted_values_gd):], predicted_values_gd)
+            # )
 
             # increase record index
-            record_index += 1
+            record_count += 1
 
     # calculate mean error for each predictor
     predictor_mean_error = {
         predictor_name: float(sum(predictor_errors[predictor_name])) / len(predictor_errors[predictor_name])
         for predictor_name in predictor_errors.keys()
     }
+    # predictor_mean_error_gd = {
+    #     predictor_name: float(sum(predictor_errors_gd[predictor_name])) / len(predictor_errors_gd[predictor_name])
+    #     for predictor_name in predictor_errors_gd.keys()
+    # }
+
+    # print('normal: ', predictor_mean_error)
+    # print('gd: ', predictor_mean_error_gd)
 
     # return mean error log
     return predictor_mean_error
@@ -212,7 +275,8 @@ def main(file_path, logger_p):
             logger_p,
             data_records,
             [
-                (OfflineAutoRegressionHandler, 1),
+                # (OfflineAutoRegressionHandler, 3),
+                (MovingAverageHandler, 1),
             ]
         )
 
