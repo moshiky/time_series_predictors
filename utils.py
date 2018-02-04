@@ -5,7 +5,7 @@ from random import shuffle
 from consts import Consts
 
 
-def parse_csv(file_path, should_shuffle=True):
+def parse_csv(file_path, should_shuffle=True, smoothing_level=0):
     # read file
     with open(file_path, 'rt') as file_handle:
         reader = csv.reader(file_handle)
@@ -14,6 +14,24 @@ def parse_csv(file_path, should_shuffle=True):
     record_list = [[float(x) for x in l] for l in file_lines if len(l) > Consts.MIN_RECORD_LENGTH]
     if should_shuffle:
         shuffle(record_list)
+
+    if smoothing_level > 0:
+        # smooth graphs
+        for record in record_list:
+            # init indexes
+            last_change_index = 0
+            changes_found = 0
+            for i in range(len(record)):
+                if record[i] > record[last_change_index]:
+                    changes_found += 1
+                    if changes_found == smoothing_level:
+                        changes_found = 0
+                        val_diff = record[i] - record[last_change_index]
+                        step_size = float(val_diff) / (i - last_change_index)
+                        for j in range(1, i - last_change_index):
+                            record[last_change_index + j] = record[last_change_index] + j * step_size
+                        last_change_index = i
+
     return record_list
 
 
