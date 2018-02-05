@@ -1,6 +1,6 @@
 
 from utils import parse_csv
-from arima_model import ARIMAModel
+from arma_model import ARMAModel
 
 
 DATASET_FILE_PATH = r'datasets/author_h_index.csv'
@@ -8,7 +8,7 @@ DATASET_FILE_PATH = r'datasets/author_h_index.csv'
 
 def predict_using_online_mode(
         ar_order, ma_order, with_c=True, initial_history_size=5, number_of_predictions_ahead=10,
-        lag_size=0, multi_step=True):
+        lag_size=0, update_model=True, use_sample_data=True):
     # read series data
     # read input file - returns list of lists
     data_records = parse_csv(DATASET_FILE_PATH, smoothing_level=1)
@@ -22,7 +22,7 @@ def predict_using_online_mode(
         current_sample = data_records[record_index]
 
         # run ARMA model
-        arma_model = ARIMAModel(p=ar_order, q=ma_order, lag_size=lag_size)
+        arma_model = ARMAModel(p=ar_order, q=ma_order, lag_size=lag_size)
         # print('>> ARMA(p={p}, q={q})'.format(p=ar_order, q=ma_order))
         try:
             prediction_error = \
@@ -30,10 +30,11 @@ def predict_using_online_mode(
                     current_sample,
                     initial_history_size,
                     number_of_predictions_ahead,
-                    record_index,
+                    with_c,
+                    update_model=update_model,
+                    use_sample_data=use_sample_data,
                     should_plot=True,
-                    add_c=with_c,
-                    multi_step=multi_step
+                    record_id=record_index
                 )
             # print('Test MSE: %.3f' % prediction_error)
             print('+ record #{record_index}: ARMA(p={p}, q={q}) error= %.3f'
@@ -54,13 +55,15 @@ if __name__ == '__main__':
     # online mode params:
     #   lag size: if zero- use  all available each time
     #   number of predictions- at least one
-    #   multi step- feed real value each time or predict all at once using forecast value
+    #   update model- update model after each prediction
+    #   use sample data- use sample data to update history
     predict_using_online_mode(
         ar_order=1,
         ma_order=0,
-        with_c=True,
+        with_c=False,
         initial_history_size=10,
-        number_of_predictions_ahead=15,
+        number_of_predictions_ahead=20,
         lag_size=10,
-        multi_step=False
+        update_model=False,
+        use_sample_data=True
     )
