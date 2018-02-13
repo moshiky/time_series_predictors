@@ -239,7 +239,7 @@ def run_online_predictors(logger_p, records, predictor_class_list):
             next_value = predictor.predict_next()
             for series_value in test_samples:
                 predicted_values.append(next_value)
-                predictor.update_predictor(series_value)
+                predictor.update_predictor(next_value)
                 next_value = predictor.predict_next()
 
             # store graph
@@ -249,6 +249,7 @@ def run_online_predictors(logger_p, records, predictor_class_list):
             predictor_errors[predictor_class_name].append(
                 calculate_mean_error(test_samples, predicted_values)
             )
+            logger_p.log(predictor_errors[predictor_class_name][-1])
 
             # increase record index
             record_index += 1
@@ -266,19 +267,19 @@ def run_online_predictors(logger_p, records, predictor_class_list):
 def main(file_path, logger_p):
 
     # read input file - returns list of lists
-    data_records = parse_csv(file_path)
+    data_records = parse_csv(file_path, smoothing_level=0, should_shuffle=False)
     logger_p.log('{num_records} records loaded'.format(num_records=len(data_records)))
 
     # run offline predictors
-    offline_predictor_errors = \
-        run_offline_predictors(
-            logger_p,
-            data_records,
-            [
-                # (OfflineAutoRegressionHandler, 3),
-                (MovingAverageHandler, 1),
-            ]
-        )
+    # offline_predictor_errors = \
+    #     run_offline_predictors(
+    #         logger_p,
+    #         data_records,
+    #         [
+    #             (OfflineAutoRegressionHandler, 1),
+    #             # (MovingAverageHandler, 1),
+    #         ]
+    #     )
 
     # run offline predictors
     online_predictor_errors = \
@@ -286,13 +287,13 @@ def main(file_path, logger_p):
             logger_p,
             data_records,
             [
-                (OnlineAutoRegressionHandler, 1),
+                (OnlineAutoRegressionHandler, 2),
             ]
         )
 
     # log results
     logger_p.log('R^2 values:')
-    logger_p.log(offline_predictor_errors)
+    # logger_p.log(offline_predictor_errors)
     logger_p.log(online_predictor_errors)
 
 

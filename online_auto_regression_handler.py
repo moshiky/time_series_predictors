@@ -15,10 +15,11 @@ class OnlineAutoRegressionHandler:
         # create offline model with history
         self.__model = OfflineAutoRegressionHandler(self.__logger, self.__window_size)
         self.__model.learn_model_params([self.__history], should_print_params=False)
+        self.__logger.log(self.__model.get_params())
 
     def predict_next(self):
         return self.__model.predict_using_learned_params(self.__history, 1)[0]
 
     def update_predictor(self, new_value):
         self.__history.append(new_value)
-        self.__initiate_model()
+        # self.__initiate_model()

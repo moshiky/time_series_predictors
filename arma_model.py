@@ -1,13 +1,15 @@
 
 
-from matplotlib import pyplot
 from statsmodels.tsa.arima_model import ARMA
 from sklearn.metrics import mean_squared_error
+import utils
 
 
 class ARMAModel:
 
-    def __init__(self, p=0, q=0, lag_size=0):
+    def __init__(self, logger, p=0, q=0, lag_size=0):
+        self.__logger = logger
+
         # set AR component order
         self.__p = p
 
@@ -17,14 +19,56 @@ class ARMAModel:
         # store lag size settings
         self.__lag_size = lag_size
 
-    def __get_fitted_model(self, history, add_c):
+    def __get_fitted_model(self, history, add_c, print_settings=False):
+        # validate data
+        if len(set(history)) == 1:
+            raise Exception("Can't fit model since all history values are the same")
+
         # create model instance
         model = ARMA(history, order=(self.__p, self.__q))
 
         # fit model
         trend = 'c' if add_c else 'nc'
-        model_fit = model.fit(disp=0, trend=trend)
-        print(model_fit.params)
+
+        solvers = [
+            'bfgs', 'powell', 'nm', 'lbfgs', 'newton', 'cg', 'ncg'
+        ]
+        methods = [
+            'css-mle', 'mle', 'css'
+        ]
+        model_fit = None
+        for trans_params_mode in [True, False]:
+            for solver in solvers:
+                for method in methods:
+                    try:
+                        model_fit = \
+                            model.fit(
+                                disp=0,
+                                trend=trend,
+                                method=method,
+                                solver=solver,
+                                transparams=trans_params_mode
+                            )
+                        if print_settings:
+                            self.__logger.log(
+                                'settings: method={method}, solver={solver}, transparams={transparams}'
+                                .format(method=method, solver=solver, transparams=trans_params_mode),
+                                should_print=False
+                            )
+                        break
+
+                    except Exception as ex:
+                        continue
+
+                if model_fit is not None:
+                    break
+
+            if model_fit is not None:
+                break
+        # self.__logger.log('fitted params: {params}'.format(params=model_fit.params))
+
+        if model_fit is None:
+            raise Exception('No settings worked')
 
         return model_fit
 
@@ -32,10 +76,10 @@ class ARMAModel:
             self, sample, initial_history_size, number_of_predictions_ahead, add_c,
             update_model=True, use_sample_data=True, should_plot=False, record_id=None):
         """
-         V update_model=True, use_sample_data=True    ==> update model each iteration and update history with real data
-         V update_model=True, use_sample_data=False   ==> update model each iteration and update history with predictions
+         update_model=True, use_sample_data=True    ==> update model each iteration and update history with real data
+         update_model=True, use_sample_data=False   ==> update model each iteration and update history with predictions
          update_model=False, use_sample_data=True   ==> don't update model but predict next values using real data
-         V update_model=False, use_sample_data=False  ==> don't update model and predict next values using predictions
+         update_model=False, use_sample_data=False  ==> don't update model and predict next values using predictions
         """
 
         if len(sample) < initial_history_size + number_of_predictions_ahead:
@@ -48,11 +92,18 @@ class ARMAModel:
         predictions = list()
 
         # fit model
-        model_fit = self.__get_fitted_model(history, add_c)
+        model_fit = self.__get_fitted_model(history, add_c, print_settings=True)
 
         # check for multi-step direct forecast settings
         if not update_model and not use_sample_data:
-            predictions = model_fit.forecast(steps=number_of_predictions_ahead)[0]
+            # predictions = model_fit.forecast(steps=number_of_predictions_ahead)[0]
+            predictions = \
+                model_fit.predict(
+                    start=initial_history_size,
+                    end=initial_history_size + number_of_predictions_ahead - 1,
+                    exog=history,
+                    dynamic=False
+                )
 
         else:
             # predict values using fitted model one by one
@@ -74,6 +125,7 @@ class ARMAModel:
                 if use_sample_data:
                     last_observation = test[prediction_index]
                     history.append(last_observation)
+
                 else:
                     history.append(yhat)
 
@@ -83,27 +135,12 @@ class ARMAModel:
 
         # plot prediction graph if needed
         if should_plot:
-            # clear plot area
-            pyplot.clf()
-            pyplot.grid(which='both')
-            # plot original series
-            pyplot.plot(
-                list(range(len(sample))),
+            utils.plot_graph_and_prediction(
                 sample,
-                '.r'
-            )
-            # plot prediction
-            pyplot.plot(
-                list(range(initial_history_size, initial_history_size+len(predictions))),
                 predictions,
-                '.b'
-            )
-            # store plotted graph
-            pyplot.savefig(
-                r'output/arma__id_{record_id}_p_{p}_q_{q}.png'
-                .format(record_id=record_id, p=self.__p, q=self.__q)
+                initial_history_size,
+                'arma__id_{record_id}_p_{p}_q_{q}'.format(record_id=record_id, p=self.__p, q=self.__q)
             )
 
-        # calculate and return mean error
-        error = mean_squared_error(test[:len(predictions)], predictions)
-        return error
+        # calculate and return error metrics
+        return utils.get_all_metrics(test[:len(predictions)], predictions)

@@ -14,7 +14,8 @@ class OfflineAutoRegressionHandler:
         # build x list
         x_values = list()
         for row in train_set:
-            x_values += [row[i:i+self.__window_size] + [1.0] for i in range(len(row[:-self.__window_size]))]
+            # x_values += [row[i:i+self.__window_size] + [1.0] for i in range(len(row[:-self.__window_size]))]
+            x_values += [row[i:i + self.__window_size] for i in range(len(row[:-self.__window_size]))]
 
         # build y list
         y_values = list()
@@ -48,6 +49,9 @@ class OfflineAutoRegressionHandler:
 
         # return predicted values
         return history[-prediction_length:]
+
+    def get_params(self):
+        return self.__params
 
     @staticmethod
     def predict_using_params(params, initial_values, prediction_length):
