@@ -41,7 +41,7 @@ class SigmoidCurve:
             predictions.append(
                 L_param / (1 + c_param * np.exp(a_param * current_x))
             )
-            xxx = 1
 
         # return predictions
         return predictions
+
