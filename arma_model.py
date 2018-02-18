@@ -109,13 +109,13 @@ class ARMAModel:
             # predict values using fitted model one by one
             for prediction_index in range(number_of_predictions_ahead):
                 # predict next value
-                output = \
-                    model_fit.predict(
-                        start=initial_history_size + prediction_index,
-                        end=initial_history_size + prediction_index,
-                        exog=history,
-                        dynamic=False
-                    )
+                output = model_fit.forecast(steps=1)
+                    # model_fit.predict(
+                    #     start=initial_history_size + prediction_index,
+                    #     end=initial_history_size + prediction_index,
+                    #     exog=history,
+                    #     dynamic=False
+                    # )
                 yhat = output[0]
 
                 # store prediction
@@ -138,7 +138,7 @@ class ARMAModel:
             utils.plot_graph_and_prediction(
                 sample,
                 predictions,
-                initial_history_size,
+                initial_history_size+1,
                 'arma__id_{record_id}_p_{p}_q_{q}'.format(record_id=record_id, p=self.__p, q=self.__q)
             )
 
