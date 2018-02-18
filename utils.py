@@ -150,3 +150,10 @@ def plot_graph_and_prediction(original_series, predictions, prediction_start_ind
 
     # store plotted graph
     pyplot.savefig(r'output/{file_name}.png'.format(file_name=file_name))
+
+
+def log_metrics_dict(logger, metrics):
+    for metric_name in sorted(metrics.keys(), reverse=True):
+        if len(metrics[metric_name]) > 0:
+            avg_metric = sum(metrics[metric_name]) / len(metrics[metric_name])
+            logger.log('{key} : {avg_value}'.format(key=metric_name, avg_value=avg_metric))
