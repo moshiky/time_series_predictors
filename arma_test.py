@@ -6,12 +6,12 @@ from logger import Logger
 
 
 DATASET_FILE_PATH = r'datasets/author_h_index.csv'
-LAG_SIZE = 6
+LAG_SIZE = 0
 INITIAL_HISTORY_SIZE = 10
 NUMBER_OF_PREDICTIONS_AHEAD = 15
 LOGGING_INTERVAL = 100
-SHOULD_PLOT = False
-IS_ONLINE = True
+SHOULD_PLOT = True
+IS_ONLINE = False
 
 
 def predict_using_online_mode(
@@ -136,7 +136,7 @@ def sigmoid_test(logger, is_online, should_plot, lag_size):
                 for i in range(NUMBER_OF_PREDICTIONS_AHEAD):
                     tmp_history = train_set + test_set[:i]
                     next_prediction = \
-                        SigmoidCurve.fit_and_predict(
+                        SigmoidCurve.fit_and_predict_recursive(
                             tmp_history[-lag_size:], 1, mid_max_rate=mid_max_rate
                         )[0]
                     sigmoid_predictions.append(next_prediction)
@@ -145,7 +145,7 @@ def sigmoid_test(logger, is_online, should_plot, lag_size):
 
             else:
                 sigmoid_predictions = \
-                    SigmoidCurve.fit_and_predict(
+                    SigmoidCurve.fit_and_predict_recursive(
                         train_set[-lag_size:], NUMBER_OF_PREDICTIONS_AHEAD
                     )
 
@@ -171,7 +171,7 @@ def sigmoid_test(logger, is_online, should_plot, lag_size):
 
 if __name__ == '__main__':
     main_logger = Logger()
-    main(main_logger)
+    # main(main_logger)
     # calc_rate(main_logger)
-    # sigmoid_test(main_logger, is_online=IS_ONLINE, should_plot=SHOULD_PLOT, lag_size=LAG_SIZE)
+    sigmoid_test(main_logger, is_online=IS_ONLINE, should_plot=SHOULD_PLOT, lag_size=LAG_SIZE)
 
