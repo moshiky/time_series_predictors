@@ -1,5 +1,6 @@
 
 import math
+import random
 import numpy as np
 
 
@@ -130,4 +131,209 @@ class SigmoidCurve:
         else:
             raise Exception('unsupported order. must be 1 or 2')
 
+    @staticmethod
+    def __get_gradient(y_t, y_t1, L_param, a_param):
+        """
+        :param L_param:
+        :param a_param:
+        :return: gradient of F using given params
+        """
 
+        # define params
+        y_t = np.float64(y_t)
+        y_t1 = np.float64(y_t1)
+        L_param = np.float64(L_param)
+        a_param = np.float64(a_param)
+
+        e_a = np.exp(a_param)
+        G = y_t + e_a * (L_param - y_t)
+        F = (L_param * y_t) / G - y_t1
+
+        # calculate L'
+        div_F_L = y_t/G - (L_param*y_t*e_a)/np.square(G)
+        div_L = 2 * F * div_F_L
+
+        # calculate a'
+        K = e_a * (L_param - y_t)
+        div_F_a = ((-1) * L_param * y_t * K) / np.square((y_t + K))
+        div_a = 2 * F * div_F_a
+
+        return np.array([div_L, div_a], dtype=np.float64)
+
+    @staticmethod
+    def __get_gradient_online(x_t, y_t, L_param, a_param, c_param):
+        # calculate common values
+        e_ax = np.exp(a_param * x_t)
+        bottom_part = 1 + c_param * e_ax
+        common_start = 2 * ((L_param / bottom_part) - y_t)
+
+        # calculate dq/dL
+        dq_dL = 1 / bottom_part
+
+        # calculate dq/da
+        dq_da = (-L_param) * a_param * e_ax / np.square(bottom_part)
+
+        # calculate dq/dc
+        dq_dc = (-L_param) * e_ax / np.square(bottom_part)
+
+        # return gradient
+        return np.array([
+            common_start * dq_dL,
+            common_start * dq_da,
+            common_start * dq_dc
+        ], dtype=np.float64)
+
+
+    @staticmethod
+    def __get_gradient_auto(y_t, y_t1, L_param, a_param):
+
+        e_a = np.exp(a_param)
+
+        # calculate L'
+        div_L = (2 * np.square(y_t) * (e_a - 1) * ((y_t1 * e_a - y_t) * L_param - y_t * y_t1 * e_a + y_t * y_t1)) \
+                / np.power((e_a * L_param - y_t * e_a + y_t), 3)
+
+        # calculate a'
+        div_a = ((-2)*y_t*L_param*(L_param-y_t)*e_a*(((y_t*L_param)/((L_param-y_t)*e_a+y_t)) - y_t1)) \
+                / np.square((L_param-y_t)*e_a + y_t)
+
+        return np.array([div_L, div_a], dtype=np.float64)
+
+    @staticmethod
+    def __get_function_avg_value(samples, L_param, a_param):
+        value_sum = 0.0
+        for _, y_t, y_t1 in samples:
+            value_sum += np.square((L_param * y_t) / (y_t + np.exp(a_param) * (L_param - y_t)) - y_t1)
+
+        return value_sum / len(samples)
+
+
+    @staticmethod
+    def fit_and_predict_gd(
+            logger, series, prediction_length, inflection_point, is_stochastic=False, epoches=1):
+        """
+        fits using stochastic gradient descent method
+        :param inflection_point:
+        :param is_stochastic:
+        :param series:
+        :param prediction_length:
+        :return:
+        """
+        # GD formula: w<t+1> = w<t> - a * grad(f)(w<t>)
+        # W[0] <- L     W[1] <- a
+        w_vector = np.array([1.0, -1.0], dtype=np.float64)
+        logger.log('L={L_param}, a={a_param}'.format(L_param=w_vector[0], a_param=w_vector[1]))
+        alpha = np.float64(0.05)
+
+        samples = [
+            [i, series[i], series[i+1]] for i in range(len(series)-1)
+        ]
+
+        last_eval = SigmoidCurve.__get_function_avg_value(samples, L_param=w_vector[0], a_param=w_vector[1])
+        # while abs(last_eval) > 0.01:
+        for epoch_id in range(epoches):
+
+            if is_stochastic:
+                # shuffle samples
+                random.shuffle(samples)
+
+            # update as many times as requested
+            for sample_index, y_t, y_t1 in samples:
+                logger.log('[#{i}] y_t= {y_t}, y_t1= {y_t1}'
+                           .format(i=sample_index, y_t=series[sample_index-1], y_t1=series[sample_index]))
+
+                gradient_values = \
+                    SigmoidCurve.__get_gradient(
+                        y_t=y_t,
+                        y_t1=y_t1,
+                        L_param=w_vector[0],
+                        a_param=w_vector[1]
+                    )
+
+                # if sample_index < inflection_point:
+                #     w_vector -= alpha * gradient_values
+                # else:
+                #     w_vector += alpha * gradient_values
+
+                w_vector -= alpha * gradient_values
+                logger.log('L={L_param}, a={a_param}'.format(L_param=w_vector[0], a_param=w_vector[1]))
+
+            # else:
+            #     for i in range(1, len(series)):
+            #         # logger.log('[#{i}] y_t= {y_t}, y_t1= {y_t1}'.format(i=i, y_t=series[i-1], y_t1=series[i]))
+            #
+            #         if w_vector[0] < series[i-1]:
+            #             new_value = np.float64(series[i-1] * 2.0)
+            #             logger.log('L: {old} -> {new}'.format(old=w_vector[0], new=new_value))
+            #             w_vector[0] = new_value
+            #
+            #         gradient_values = \
+            #             SigmoidCurve.__get_gradient(
+            #                 y_t=series[i-1],
+            #                 y_t1=series[i],
+            #                 L_param=w_vector[0],
+            #                 a_param=w_vector[1]
+            #             )
+            #         if i < inflection_point:
+            #             w_vector -= alpha * gradient_values
+            #         else:
+            #             w_vector += alpha * gradient_values
+
+            logger.log('L={L_param}, a={a_param}'.format(L_param=w_vector[0], a_param=w_vector[1]))
+
+            last_eval = SigmoidCurve.__get_function_avg_value(samples, L_param=w_vector[0], a_param=w_vector[1])
+            logger.log('## func. eval.: {avg_eval}'.format(avg_eval=last_eval))
+
+        L_param = w_vector[0]
+        a_param = w_vector[1]
+
+        return L_param, a_param
+
+    @staticmethod
+    def fit_and_predict_gd_online(
+            logger, series, prediction_length, inflection_point, is_stochastic=False, epoches=1):
+        """
+        fits using stochastic gradient descent method
+        :param inflection_point:
+        :param is_stochastic:
+        :param series:
+        :param prediction_length:
+        :return:
+        """
+        # GD formula: w<t+1> = w<t> - a * grad(f)(w<t>)
+        # W[0] <- L     W[1] <- a      W[2] <- c
+        w_vector = np.array([random.random(), -random.random(), random.random()], dtype=np.float64)
+        logger.log(w_vector)
+        alpha = np.float64(0.1)
+
+        x_values = list(range(1, len(series)+1))
+
+        for i in range(epoches):
+
+            if is_stochastic:
+                # shuffle samples
+                random.shuffle(x_values)
+
+            for sample_index in x_values:
+                logger.log('[#{i}] y_t= {y_t}'
+                           .format(i=sample_index, y_t=series[sample_index - 1]))
+
+                gradient_values = \
+                    SigmoidCurve.__get_gradient_online(
+                        x_t=sample_index,
+                        y_t=series[sample_index-1],
+                        L_param=w_vector[0],
+                        a_param=w_vector[1],
+                        c_param=w_vector[2]
+                    )
+
+                w_vector -= alpha * gradient_values
+
+                logger.log('L={L_param}, a={a_param}, c={c_param}'
+                           .format(L_param=w_vector[0], a_param=w_vector[1], c_param=w_vector[2]))
+
+        L_param = w_vector[0]
+        a_param = w_vector[1]
+        c_param = w_vector[2]
+
+        return L_param, a_param, c_param

@@ -169,9 +169,57 @@ def sigmoid_test(logger, is_online, should_plot, lag_size):
     utils.log_metrics_dict(logger, model_error_metrics)
 
 
+def test_gradient_descent(logger):
+    add_noise = False
+    should_plot = False
+
+    series = [
+        # ## direct version
+        # L=10, a=-0.1, c=1.5
+        utils.get_synthetic_sigmoid(10, -0.1, 40, length=100, add_noise=add_noise, should_plot=should_plot),
+        # L=20, a=-0.2, c=0.9
+        utils.get_synthetic_sigmoid(20, -0.02, 90, length=400, add_noise=add_noise, should_plot=should_plot),
+        # L=5, a=-0.01, c=3
+        utils.get_synthetic_sigmoid(5, -0.003, 10, length=1500, add_noise=add_noise, should_plot=should_plot),
+
+        # # ## ts version
+        # # L=10, a=-0.1
+        # utils.get_synthetic_sigmoid_ts(10, -0.1, 100, 0.1, add_noise=add_noise, should_plot=should_plot),
+        # # L=20, a=-0.2
+        # utils.get_synthetic_sigmoid_ts(20, -0.2, 200, 0.1, add_noise=add_noise, should_plot=should_plot),
+        # # L=5, a=-0.01
+        # utils.get_synthetic_sigmoid_ts(5, -0.01, 1500, 0.001, add_noise=add_noise, should_plot=should_plot)
+    ]
+
+    # ## direct version
+    for ser_index in range(len(series)):
+        ser = series[ser_index]
+
+        # find inflection point of the sigmoid
+        inflection_point = utils.get_inflection_point_of_sigmoid(ser)
+        logger.log('inflection point: {inf_point}'.format(inf_point=inflection_point))
+
+        # calculate sigmoid params using gradient descent
+        L, a, c = \
+            SigmoidCurve.fit_and_predict_gd_online(logger, ser, 1, inflection_point, is_stochastic=False, epoches=1)
+        logger.log('L: {L_param}, a: {a_param}, c: {c_param}'.format(L_param=L, a_param=a, c_param=c))
+
+    # # ## ts version
+    # for ser_index in range(len(series)):
+    #     ser = series[ser_index]
+    #
+    #     # find inflection point of the sigmoid
+    #     inflection_point = utils.get_inflection_point_of_sigmoid(ser)
+    #     logger.log('inflection point: {inf_point}'.format(inf_point=inflection_point))
+    #
+    #     # calculate sigmoid params using gradient descent
+    #     L, a = SigmoidCurve.fit_and_predict_gd(logger, ser, 1, inflection_point, is_stochastic=False, epoches=1)
+    #     logger.log('L: {L_param}, a: {a_param}'.format(L_param=L, a_param=a))
+
+
 if __name__ == '__main__':
     main_logger = Logger()
     # main(main_logger)
     # calc_rate(main_logger)
-    sigmoid_test(main_logger, is_online=IS_ONLINE, should_plot=SHOULD_PLOT, lag_size=LAG_SIZE)
-
+    # sigmoid_test(main_logger, is_online=IS_ONLINE, should_plot=SHOULD_PLOT, lag_size=LAG_SIZE)
+    test_gradient_descent(main_logger)

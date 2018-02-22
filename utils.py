@@ -3,7 +3,7 @@ from matplotlib import pyplot
 import csv
 from scipy import stats
 import numpy as np
-from random import shuffle
+import random
 from sklearn.metrics import mean_squared_error
 from consts import Consts
 
@@ -16,7 +16,7 @@ def parse_csv(file_path, should_shuffle=True, smoothing_level=0):
 
     record_list = [[float(x) for x in l] for l in file_lines if len(l) > Consts.MIN_RECORD_LENGTH]
     if should_shuffle:
-        shuffle(record_list)
+        random.shuffle(record_list)
 
     if smoothing_level > 0:
         # smooth graphs
@@ -142,11 +142,11 @@ def plot_graph_and_prediction(original_series, predictions, prediction_start_ind
     )
 
     # plot prediction
-    pyplot.plot(
-        list(range(prediction_start_index, prediction_start_index + len(predictions))),
-        predictions,
-        '.b'
-    )
+    # pyplot.plot(
+    #     list(range(prediction_start_index, prediction_start_index + len(predictions))),
+    #     predictions,
+    #     '.b'
+    # )
 
     # store plotted graph
     pyplot.savefig(r'output/{file_name}.png'.format(file_name=file_name))
@@ -157,3 +157,102 @@ def log_metrics_dict(logger, metrics):
         if len(metrics[metric_name]) > 0:
             avg_metric = sum(metrics[metric_name]) / len(metrics[metric_name])
             logger.log('{key} : {avg_value}'.format(key=metric_name, avg_value=avg_metric))
+
+
+def get_synthetic_sigmoid_ts(L_param, a_param, length, y_t0, add_noise=False, should_plot=False):
+    """
+    return sigmoid series values.
+
+                       L * y_t
+    y_<t+1> =  ------------------------
+               y_t + exp(a)*(L - y_t)
+
+    :param add_noise:
+    :param should_plot:
+    :param L_param:
+    :param a_param:
+    :param length:
+    :param y_t0:
+    :return:
+    """
+    series_values = [np.float64(y_t0)]
+
+    for i in range(length):
+        y_t = series_values[-1]
+        e_a = np.exp(a_param)
+        new_value = (L_param * y_t) / (y_t + e_a * (L_param - y_t))
+
+        if add_noise:
+            new_value += (-1.0 + 2 * random.random())
+
+        series_values.append(np.float64(new_value))
+
+    # ## plot
+    # clear plot area
+    if should_plot:
+        pyplot.clf()
+        pyplot.grid(which='both')
+
+        # plot series
+        pyplot.plot(series_values, '-r')
+        pyplot.show()
+
+    return series_values
+
+
+def get_synthetic_sigmoid(L_param, a_param, c_param, length, add_noise=False, should_plot=False):
+    """
+    return sigmoid series values.
+
+                   L
+    f(x) =  ---------------
+            1 + c * exp(ax)
+
+    x = 1, 2, ...
+
+    :param c_param:
+    :param add_noise:
+    :param should_plot:
+    :param L_param:
+    :param a_param:
+    :param length:
+    :param y_t0:
+    :return:
+    """
+    series_values = np.array([], dtype=np.float64)
+    noise_amp = 0.05 * L_param
+
+    for i in range(length):
+        x_t = i + 1
+        e_ax = np.exp(a_param * x_t)
+        new_value = L_param / (1 + c_param * e_ax)
+
+        if add_noise:
+            new_value += (2 * random.random() * noise_amp - noise_amp)
+
+        series_values = np.append(series_values, new_value)
+
+    # ## plot
+    # clear plot area
+    if should_plot:
+        pyplot.clf()
+        pyplot.grid(which='both')
+
+        # plot series
+        pyplot.plot(series_values, '-r')
+        pyplot.show()
+
+    return series_values
+
+
+def get_inflection_point_of_sigmoid(series):
+
+    last_slope = series[1] - series[0]
+    for current_index in range(2, len(series)):
+        current_slope = series[current_index] - series[current_index - 1]
+        if current_slope < last_slope:
+            return current_index
+
+        last_slope = current_slope
+
+    return None
