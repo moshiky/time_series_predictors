@@ -200,7 +200,8 @@ def get_synthetic_sigmoid_ts(L_param, a_param, length, y_t0, add_noise=False, sh
     return series_values
 
 
-def get_synthetic_sigmoid(L_param, a_param, c_param, length, add_noise=False, should_plot=False):
+def get_synthetic_sigmoid(l_param, a_param, c_param, length, add_noise=False, should_plot=False,
+                          x_range=None, y_range=None):
     """
     return sigmoid series values.
 
@@ -210,27 +211,40 @@ def get_synthetic_sigmoid(L_param, a_param, c_param, length, add_noise=False, sh
 
     x = 1, 2, ...
 
+    :param y_range:
+    :param x_range:
     :param c_param:
     :param add_noise:
     :param should_plot:
-    :param L_param:
+    :param l_param:
     :param a_param:
     :param length:
     :param y_t0:
     :return:
     """
+
+    # initiate default x and y ranges
+    if x_range is None:
+        x_range = [0.0, 1.0]
+
+    if y_range is None:
+        y_range = [0.0, 1.0]
+
     series_values = np.array([], dtype=np.float64)
-    noise_amp = 0.05 * L_param
+    noise_amp = 0.05 * l_param
+    x_step_size = (x_range[1]-x_range[0]) / length
+    y_range_size = y_range[1]-y_range[0]
 
     for i in range(length):
-        x_t = i + 1
+        x_t = x_range[0] + i*x_step_size
         e_ax = np.exp(a_param * x_t)
-        new_value = L_param / (1 + c_param * e_ax)
+        new_value = l_param / (1 + c_param * e_ax)
 
         if add_noise:
             new_value += (2 * random.random() * noise_amp - noise_amp)
 
-        series_values = np.append(series_values, new_value)
+        normalized_y_value = ((new_value / l_param) * y_range_size) + y_range[0]
+        series_values = np.append(series_values, normalized_y_value)
 
     # ## plot
     # clear plot area
@@ -239,7 +253,7 @@ def get_synthetic_sigmoid(L_param, a_param, c_param, length, add_noise=False, sh
         pyplot.grid(which='both')
 
         # plot series
-        pyplot.plot(series_values, '-r')
+        pyplot.plot([x_range[0]+i*x_step_size for i in range(length)], series_values, '-r')
         pyplot.show()
 
     return series_values

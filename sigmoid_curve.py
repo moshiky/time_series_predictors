@@ -1,5 +1,7 @@
 
+import time
 import math
+from matplotlib import pyplot
 import random
 import numpy as np
 
@@ -24,8 +26,8 @@ class SigmoidCurve:
         """
         # translate params according to "data linearization" method
         X_values = [[i+1, 1.0] for i in range(len(series))]
-        L_param = series[-1] * mid_max_rate
-        Y_values = [np.log((L_param/y_value) - 1) for y_value in series]
+        l_param = series[-1] * mid_max_rate
+        Y_values = [np.log((l_param/y_value) - 1) for y_value in series]
 
         # fit linear model params: Y = A*X + B
         linear_params = np.linalg.lstsq(X_values, Y_values)[0]
@@ -40,7 +42,7 @@ class SigmoidCurve:
         for i in range(prediction_length):
             current_x = len(series) + i
             predictions.append(
-                L_param / (1 + c_param * np.exp(a_param * current_x))
+                l_param / (1 + c_param * np.exp(a_param * current_x))
             )
 
         # return predictions
@@ -70,7 +72,7 @@ class SigmoidCurve:
         :return:
         """
         # calculate L value
-        L_param = series[-1] * mid_max_rate
+        l_param = series[-1] * mid_max_rate
 
         # initiate X and Y value arrays
         X_values = list()
@@ -86,8 +88,8 @@ class SigmoidCurve:
                 A_value = \
                     np.log(series[i]) \
                     - np.log(series[i+n]) \
-                    + np.log(L_param - series[i+n]) \
-                    - np.log(L_param - series[i])
+                    + np.log(l_param - series[i+n]) \
+                    - np.log(l_param - series[i])
 
                 # append to X and Y value arrays
                 X_values += [[A_value]]
@@ -107,7 +109,7 @@ class SigmoidCurve:
             for i in range(prediction_length):
                 last_y = predictions[-1]
                 predictions.append(
-                    L_param / (1 + np.exp(a_param) * ((L_param / last_y) - 1))
+                    l_param / (1 + np.exp(a_param) * ((l_param / last_y) - 1))
                 )
 
             # return predictions
@@ -119,10 +121,10 @@ class SigmoidCurve:
                 y_t = predictions[-2]
                 y_t1 = predictions[-1]
 
-                ytea = 1 + np.exp(a_param) * ((L_param/y_t) - 1)
+                ytea = 1 + np.exp(a_param) * ((l_param/y_t) - 1)
 
                 predictions.append(
-                    L_param / (1 + np.exp(a_param) * (((ytea*2*L_param)/(ytea*y_t1+L_param)) - 1))
+                    l_param / (1 + np.exp(a_param) * (((ytea*2*l_param)/(ytea*y_t1+l_param)) - 1))
                 )
 
             # return predictions
@@ -132,9 +134,9 @@ class SigmoidCurve:
             raise Exception('unsupported order. must be 1 or 2')
 
     @staticmethod
-    def __get_gradient(y_t, y_t1, L_param, a_param):
+    def __get_gradient(y_t, y_t1, l_param, a_param):
         """
-        :param L_param:
+        :param l_param:
         :param a_param:
         :return: gradient of F using given params
         """
@@ -142,39 +144,39 @@ class SigmoidCurve:
         # define params
         y_t = np.float64(y_t)
         y_t1 = np.float64(y_t1)
-        L_param = np.float64(L_param)
+        l_param = np.float64(l_param)
         a_param = np.float64(a_param)
 
         e_a = np.exp(a_param)
-        G = y_t + e_a * (L_param - y_t)
-        F = (L_param * y_t) / G - y_t1
+        G = y_t + e_a * (l_param - y_t)
+        F = (l_param * y_t) / G - y_t1
 
         # calculate L'
-        div_F_L = y_t/G - (L_param*y_t*e_a)/np.square(G)
+        div_F_L = y_t/G - (l_param*y_t*e_a)/np.square(G)
         div_L = 2 * F * div_F_L
 
         # calculate a'
-        K = e_a * (L_param - y_t)
-        div_F_a = ((-1) * L_param * y_t * K) / np.square((y_t + K))
+        K = e_a * (l_param - y_t)
+        div_F_a = ((-1) * l_param * y_t * K) / np.square((y_t + K))
         div_a = 2 * F * div_F_a
 
         return np.array([div_L, div_a], dtype=np.float64)
 
     @staticmethod
-    def __get_gradient_online(x_t, y_t, L_param, a_param, c_param):
+    def __get_gradient_online(x_t, y_t, l_param, a_param, c_param):
         # calculate common values
         e_ax = np.exp(a_param * x_t)
         bottom_part = 1 + c_param * e_ax
-        common_start = 2 * ((L_param / bottom_part) - y_t)
+        common_start = 2 * ((l_param / bottom_part) - y_t)
 
         # calculate dq/dL
         dq_dL = 1 / bottom_part
 
         # calculate dq/da
-        dq_da = (-L_param) * a_param * e_ax / np.square(bottom_part)
+        dq_da = (-1) * l_param * c_param * x_t * e_ax / np.square(bottom_part)
 
         # calculate dq/dc
-        dq_dc = (-L_param) * e_ax / np.square(bottom_part)
+        dq_dc = (-1) * l_param * e_ax / np.square(bottom_part)
 
         # return gradient
         return np.array([
@@ -183,30 +185,31 @@ class SigmoidCurve:
             common_start * dq_dc
         ], dtype=np.float64)
 
-
     @staticmethod
-    def __get_gradient_auto(y_t, y_t1, L_param, a_param):
-
-        e_a = np.exp(a_param)
-
-        # calculate L'
-        div_L = (2 * np.square(y_t) * (e_a - 1) * ((y_t1 * e_a - y_t) * L_param - y_t * y_t1 * e_a + y_t * y_t1)) \
-                / np.power((e_a * L_param - y_t * e_a + y_t), 3)
-
-        # calculate a'
-        div_a = ((-2)*y_t*L_param*(L_param-y_t)*e_a*(((y_t*L_param)/((L_param-y_t)*e_a+y_t)) - y_t1)) \
-                / np.square((L_param-y_t)*e_a + y_t)
-
-        return np.array([div_L, div_a], dtype=np.float64)
-
-    @staticmethod
-    def __get_function_avg_value(samples, L_param, a_param):
+    def __get_function_avg_value(samples, l_param, a_param):
         value_sum = 0.0
         for _, y_t, y_t1 in samples:
-            value_sum += np.square((L_param * y_t) / (y_t + np.exp(a_param) * (L_param - y_t)) - y_t1)
+            value_sum += np.square((l_param * y_t) / (y_t + np.exp(a_param) * (l_param - y_t)) - y_t1)
 
         return value_sum / len(samples)
 
+    @staticmethod
+    def __get_function_avg_value_online(x_values, series_by_x, l_param, a_param, c_param):
+        value_sum = 0.0
+        for x_t in x_values:
+            value_sum += np.square(l_param / (1 + c_param * np.exp(a_param * x_t)) - series_by_x[x_t])
+
+        return value_sum / len(x_values)
+
+    @staticmethod
+    def __get_mean_error_rate(x_values, series_by_x, l_param, a_param, c_param):
+        error_rates_total = 0.0
+        for x_t in x_values:
+            function_value = l_param / (1 + c_param * np.exp(a_param * x_t))
+            y_t = series_by_x[x_t]
+            error_rates_total += (abs(y_t - function_value) / y_t)
+
+        return error_rates_total / len(x_values)
 
     @staticmethod
     def fit_and_predict_gd(
@@ -222,14 +225,14 @@ class SigmoidCurve:
         # GD formula: w<t+1> = w<t> - a * grad(f)(w<t>)
         # W[0] <- L     W[1] <- a
         w_vector = np.array([1.0, -1.0], dtype=np.float64)
-        logger.log('L={L_param}, a={a_param}'.format(L_param=w_vector[0], a_param=w_vector[1]))
-        alpha = np.float64(0.05)
+        logger.log('L={l_param}, a={a_param}'.format(l_param=w_vector[0], a_param=w_vector[1]))
+        alpha = np.float64(0.001)
 
         samples = [
             [i, series[i], series[i+1]] for i in range(len(series)-1)
         ]
 
-        last_eval = SigmoidCurve.__get_function_avg_value(samples, L_param=w_vector[0], a_param=w_vector[1])
+        last_eval = SigmoidCurve.__get_function_avg_value(samples, l_param=w_vector[0], a_param=w_vector[1])
         # while abs(last_eval) > 0.01:
         for epoch_id in range(epoches):
 
@@ -246,94 +249,131 @@ class SigmoidCurve:
                     SigmoidCurve.__get_gradient(
                         y_t=y_t,
                         y_t1=y_t1,
-                        L_param=w_vector[0],
+                        l_param=w_vector[0],
                         a_param=w_vector[1]
                     )
 
-                # if sample_index < inflection_point:
-                #     w_vector -= alpha * gradient_values
-                # else:
-                #     w_vector += alpha * gradient_values
-
                 w_vector -= alpha * gradient_values
-                logger.log('L={L_param}, a={a_param}'.format(L_param=w_vector[0], a_param=w_vector[1]))
+                logger.log('L={l_param}, a={a_param}'.format(l_param=w_vector[0], a_param=w_vector[1]))
 
-            # else:
-            #     for i in range(1, len(series)):
-            #         # logger.log('[#{i}] y_t= {y_t}, y_t1= {y_t1}'.format(i=i, y_t=series[i-1], y_t1=series[i]))
-            #
-            #         if w_vector[0] < series[i-1]:
-            #             new_value = np.float64(series[i-1] * 2.0)
-            #             logger.log('L: {old} -> {new}'.format(old=w_vector[0], new=new_value))
-            #             w_vector[0] = new_value
-            #
-            #         gradient_values = \
-            #             SigmoidCurve.__get_gradient(
-            #                 y_t=series[i-1],
-            #                 y_t1=series[i],
-            #                 L_param=w_vector[0],
-            #                 a_param=w_vector[1]
-            #             )
-            #         if i < inflection_point:
-            #             w_vector -= alpha * gradient_values
-            #         else:
-            #             w_vector += alpha * gradient_values
+            logger.log('L={l_param}, a={a_param}'.format(l_param=w_vector[0], a_param=w_vector[1]))
 
-            logger.log('L={L_param}, a={a_param}'.format(L_param=w_vector[0], a_param=w_vector[1]))
-
-            last_eval = SigmoidCurve.__get_function_avg_value(samples, L_param=w_vector[0], a_param=w_vector[1])
+            last_eval = SigmoidCurve.__get_function_avg_value(samples, l_param=w_vector[0], a_param=w_vector[1])
             logger.log('## func. eval.: {avg_eval}'.format(avg_eval=last_eval))
 
-        L_param = w_vector[0]
+        l_param = w_vector[0]
         a_param = w_vector[1]
 
-        return L_param, a_param
+        return l_param, a_param
+
+    @staticmethod
+    def __update_eval_plot(eval_plot, values):
+        # clear old values
+        eval_plot.clf()
+
+        # plot series
+        pyplot.plot(values)
 
     @staticmethod
     def fit_and_predict_gd_online(
-            logger, series, prediction_length, inflection_point, is_stochastic=False, epoches=1):
+            logger, series, x_range, prediction_length, inflection_point, is_stochastic=False, epochs=1):
         """
         fits using stochastic gradient descent method
+        :param x_range:
+        :param epochs:
+        :param logger:
         :param inflection_point:
         :param is_stochastic:
         :param series:
         :param prediction_length:
         :return:
         """
-        # GD formula: w<t+1> = w<t> - a * grad(f)(w<t>)
+
+        LOGGING_INTERVAL = 10000
+
+        series_length = len(series)
+        x_step_size = (x_range[1]-x_range[0]) / series_length
+        x_values = [x_range[0]+i*x_step_size for i in range(series_length)]
+
+        series_by_x = {
+            x_values[i]: series[i] for i in range(len(series))
+        }
+
+        # GD formula: w<t+1> = w<t> - gamma * grad(f)(w<t>)
         # W[0] <- L     W[1] <- a      W[2] <- c
-        w_vector = np.array([random.random(), -random.random(), random.random()], dtype=np.float64)
-        logger.log(w_vector)
-        alpha = np.float64(0.1)
+        w_vector = np.array([1.0, -random.random(), random.random()], dtype=np.float64)
+        gamma_0 = np.float64(100.0)
 
-        x_values = list(range(1, len(series)+1))
+        # log initial params
+        logger.log('L={l_param}, a={a_param}, c={c_param}'
+                   .format(l_param=w_vector[0], a_param=w_vector[1], c_param=w_vector[2]))
 
-        for i in range(epoches):
+        evaluations = list()
+        last_evaluation = \
+            SigmoidCurve.__get_mean_error_rate(
+                x_values, series_by_x, l_param=w_vector[0], a_param=w_vector[1], c_param=w_vector[2]
+            )
+        logger.log('eval: {evaluation}'.format(evaluation=last_evaluation))
+        evaluations.append(last_evaluation)
+
+        eval_fig = pyplot.figure()
+        eval_ax = eval_fig.add_subplot(1, 1, 1)
+        eval_ax.plot(evaluations)
+        pyplot.show(block=False)
+
+        update_number = 1
+        epoch_id = 0
+
+        # for i in range(epochs):
+        while last_evaluation > 0.00000001:
+
+            epoch_id += 1
+            if (epoch_id % LOGGING_INTERVAL) == 0:
+                logger.log('%%%%%%%%% epoch #{ep_id}'.format(ep_id=epoch_id))
 
             if is_stochastic:
                 # shuffle samples
                 random.shuffle(x_values)
 
-            for sample_index in x_values:
-                logger.log('[#{i}] y_t= {y_t}'
-                           .format(i=sample_index, y_t=series[sample_index - 1]))
+            for x_t in x_values:
+                y_t = series_by_x[x_t]
+                # logger.log('x_t={x_t} y_t={y_t}'.format(x_t=x_t, y_t=y_t))
 
                 gradient_values = \
                     SigmoidCurve.__get_gradient_online(
-                        x_t=sample_index,
-                        y_t=series[sample_index-1],
-                        L_param=w_vector[0],
+                        x_t=x_t,
+                        y_t=y_t,
+                        l_param=w_vector[0],
                         a_param=w_vector[1],
                         c_param=w_vector[2]
                     )
 
-                w_vector -= alpha * gradient_values
+                # logger.log('gradient: {gradient}'.format(gradient=gradient_values))
+                gamma = gamma_0 / np.sqrt(update_number)
+                w_vector -= gamma_0 * gradient_values
+                update_number += 1
 
-                logger.log('L={L_param}, a={a_param}, c={c_param}'
-                           .format(L_param=w_vector[0], a_param=w_vector[1], c_param=w_vector[2]))
+                w_vector[0] = 1.0
+                # w_vector[2] = 1.5
 
-        L_param = w_vector[0]
+                if (update_number % LOGGING_INTERVAL) == 0:
+                    logger.log('L={l_param}, a={a_param}, c={c_param}'
+                               .format(l_param=w_vector[0], a_param=w_vector[1], c_param=w_vector[2]))
+                    new_evaluation = \
+                        SigmoidCurve.__get_mean_error_rate(
+                            x_values, series_by_x, l_param=w_vector[0], a_param=w_vector[1], c_param=w_vector[2]
+                        )
+                    logger.log('eval: {evaluation}'.format(evaluation=new_evaluation))
+
+                    last_evaluation = new_evaluation
+                    evaluations.append(last_evaluation)
+
+                    eval_ax.clear()
+                    eval_ax.plot(evaluations)
+                    pyplot.pause(0.001)
+
+        l_param = w_vector[0]
         a_param = w_vector[1]
         c_param = w_vector[2]
 
-        return L_param, a_param, c_param
+        return l_param, a_param, c_param
