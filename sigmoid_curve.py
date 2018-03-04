@@ -202,6 +202,15 @@ class SigmoidCurve:
         return value_sum / len(x_values)
 
     @staticmethod
+    def get_sigmoid_predictions_for_values(l_param, a_param, c_param, x_values):
+        y_values_for_x = dict()
+        for x_t in x_values:
+            y_t = l_param / (1 + c_param * np.exp(a_param * x_t))
+            y_values_for_x[x_t] = y_t
+        return y_values_for_x
+
+
+    @staticmethod
     def __get_mean_error_rate(x_values, series_by_x, l_param, a_param, c_param):
         error_rates_total = 0.0
         for x_t in x_values:

@@ -187,6 +187,7 @@ def test_gradient_descent(logger):
     for series_index in range(len(params)):
         logger.log('## series #{ser_index}'.format(ser_index=series_index))
 
+        logger.log('# create series..')
         series = \
             utils.get_synthetic_sigmoid(
                 l_param=params[series_index][0],
@@ -202,6 +203,7 @@ def test_gradient_descent(logger):
         logger.log('inflection point: {inf_point}'.format(inf_point=inflection_point))
 
         # calculate sigmoid params using gradient descent
+        logger.log('# fit sigmoid params..')
         l, a, c = \
             SigmoidCurve.fit_and_predict_gd_online(
                 logger, series, params[series_index][3], series_length*0.5, inflection_point,
@@ -212,6 +214,12 @@ def test_gradient_descent(logger):
             l_param=params[series_index][0], a_param=params[series_index][1], c_param=params[series_index][2])
         )
         logger.log('learned params: l: {l_param}, a: {a_param}, c: {c_param}'.format(l_param=l, a_param=a, c_param=c))
+
+        # predict next values
+        # <offline>
+        y_predictions_for_x = SigmoidCurve.get_sigmoid_predictions_for_values(l, a, c, )
+
+        # <online>
 
 
 if __name__ == '__main__':
