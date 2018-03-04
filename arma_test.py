@@ -177,7 +177,7 @@ def test_gradient_descent(logger):
 
     # define test params- [L, a, c, x_range, y_range]
     params = [
-        [1, -10, 70, [0, 1], [0, 1]],
+        [80.7, -10, 70, [0, 1], [0, 80.7]],
         # [10, -0.1, 40],
         # [20, -0.02, 90],
         # [5, -0.003, 10]

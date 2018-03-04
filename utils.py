@@ -233,7 +233,7 @@ def get_synthetic_sigmoid(l_param, a_param, c_param, length, add_noise=False, sh
     series_values = np.array([], dtype=np.float64)
     noise_amp = 0.05 * l_param
     x_step_size = (x_range[1]-x_range[0]) / length
-    y_range_size = y_range[1]-y_range[0]
+    y_range_size = y_range[1] - y_range[0]
 
     for i in range(length):
         x_t = x_range[0] + i*x_step_size

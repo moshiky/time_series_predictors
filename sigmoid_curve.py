@@ -226,7 +226,7 @@ class SigmoidCurve:
         # W[0] <- L     W[1] <- a
         w_vector = np.array([1.0, -1.0], dtype=np.float64)
         logger.log('L={l_param}, a={a_param}'.format(l_param=w_vector[0], a_param=w_vector[1]))
-        alpha = np.float64(0.001)
+        alpha = np.float64(0.0001)
 
         samples = [
             [i, series[i], series[i+1]] for i in range(len(series)-1)
@@ -290,6 +290,8 @@ class SigmoidCurve:
         """
 
         LOGGING_INTERVAL = 10000
+        EVALUATION_INTERVAL = 10000
+        PERFORMANCE_MODE = False
 
         series_length = len(series)
         x_step_size = (x_range[1]-x_range[0]) / series_length
@@ -301,8 +303,8 @@ class SigmoidCurve:
 
         # GD formula: w<t+1> = w<t> - gamma * grad(f)(w<t>)
         # W[0] <- L     W[1] <- a      W[2] <- c
-        w_vector = np.array([1.0, -random.random(), random.random()], dtype=np.float64)
-        gamma_0 = np.float64(100.0)
+        w_vector = np.array([random.random(), -random.random(), random.random()], dtype=np.float64)
+        gamma_0 = np.float64(0.00001)
 
         # log initial params
         logger.log('L={l_param}, a={a_param}, c={c_param}'
@@ -324,11 +326,14 @@ class SigmoidCurve:
         update_number = 1
         epoch_id = 0
 
+        # params_last_change_direction = None
+        # last_dir_change_update_number = 0
+
         # for i in range(epochs):
-        while last_evaluation > 0.00000001:
+        while last_evaluation > 1e-2:
 
             epoch_id += 1
-            if (epoch_id % LOGGING_INTERVAL) == 0:
+            if not PERFORMANCE_MODE and (epoch_id % LOGGING_INTERVAL) == 0:
                 logger.log('%%%%%%%%% epoch #{ep_id}'.format(ep_id=epoch_id))
 
             if is_stochastic:
@@ -349,16 +354,33 @@ class SigmoidCurve:
                     )
 
                 # logger.log('gradient: {gradient}'.format(gradient=gradient_values))
-                gamma = gamma_0 / np.sqrt(update_number)
-                w_vector -= gamma_0 * gradient_values
+                # params_change_direction = 1 if gradient_values[1] > 0 else -1
+                # if params_last_change_direction is not None and params_change_direction != params_last_change_direction:
+                #     params_last_change_direction = params_change_direction
+                #     last_dir_change_update_number = update_number-1
+                #     print('change')
+                #
+                # gamma = gamma_0 * np.square(np.log(update_number - last_dir_change_update_number))
+
+                # gamma = gamma_0 / update_number
+                gamma = gamma_0 * np.square(np.log(update_number))
+                # print(w_vector)
+                w_vector -= gamma * gradient_values
                 update_number += 1
 
-                w_vector[0] = 1.0
-                # w_vector[2] = 1.5
+                # w_vector[0] = 1.0
 
                 if (update_number % LOGGING_INTERVAL) == 0:
+                    logger.log('updates: {update_number}'.format(update_number=update_number))
+                    logger.log('gamma: {gamma}'.format(gamma=gamma))
                     logger.log('L={l_param}, a={a_param}, c={c_param}'
                                .format(l_param=w_vector[0], a_param=w_vector[1], c_param=w_vector[2]))
+
+                    eval_ax.clear()
+                    eval_ax.plot(evaluations)
+                    pyplot.pause(0.001)
+
+                if (update_number % EVALUATION_INTERVAL) == 0:
                     new_evaluation = \
                         SigmoidCurve.__get_mean_error_rate(
                             x_values, series_by_x, l_param=w_vector[0], a_param=w_vector[1], c_param=w_vector[2]
@@ -368,9 +390,9 @@ class SigmoidCurve:
                     last_evaluation = new_evaluation
                     evaluations.append(last_evaluation)
 
-                    eval_ax.clear()
-                    eval_ax.plot(evaluations)
-                    pyplot.pause(0.001)
+        # log learn statistics
+        logger.log('epochs: {epoch_id}'.format(epoch_id=epoch_id))
+        logger.log('updates: {update_id}'.format(update_id=update_number))
 
         l_param = w_vector[0]
         a_param = w_vector[1]
