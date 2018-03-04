@@ -1,0 +1,121 @@
+
+from matplotlib import pyplot
+import random
+import numpy as np
+
+
+class GradientDescentFitter:
+
+    LOGGING_INTERVAL = 10000    # updates
+    EVALUATION_INTERVAL = 100   # epochs
+
+    def __init__(self, logger, target_function, gradient_function):
+        self.__logger = logger
+        self.__target_function = target_function
+        self.__gradient_function = gradient_function
+
+    def fit_and_predict_gd_online(self, y_for_x, w_size, is_stochastic=False, max_epochs=None, fit_limit_rank=None,
+                                  first_w=None, gamma_0=0.0001, plot_progress=True):
+        """
+        fits using stochastic gradient descent method
+        :param plot_progress:
+        :param gamma_0:
+        :param y_for_x:
+        :param w_size:
+        :param is_stochastic:
+        :param max_epochs:
+        :param fit_limit_rank:
+        :param first_w:
+        :return:
+        """
+
+        if max_epochs is None and fit_limit_rank is None:
+            raise Exception('must define epochs or fit_limit_rank, or both')
+
+        # GD formula: w<t+1> = w<t> - gamma_t * grad(f)(w<t>)
+
+        # initiate w vector
+        if first_w is not None:
+            w_vector = first_w
+        else:
+            w_vector = np.random.rand(w_size)
+
+        # set data type
+        w_vector = np.array(w_vector, dtype=np.float64)
+        gamma_0 = np.float64(gamma_0)
+
+        # log initial params
+        self.__logger.log('initial params: w={w_vector}, gamma_0={gamma_0}'.format(w_vector=w_vector, gamma_0=gamma_0))
+
+        # initiate progress logging
+        evaluations = list()
+        last_evaluation = self.__target_function(y_for_x, w_vector)
+        evaluations.append(last_evaluation)
+        self.__logger.log('initial evaluation: {evaluation}'.format(evaluation=last_evaluation))
+
+        eval_fig = pyplot.figure()
+        eval_ax = eval_fig.add_subplot(1, 1, 1)
+        if plot_progress:
+            eval_ax.plot(evaluations)
+            pyplot.show(block=False)
+
+        # initiate fitting counters
+        t_counter = 1
+        epoch_id = 0
+
+        # extract x values
+        x_values = list(y_for_x.keys())
+
+        # for i in range(epochs):
+        while ((fit_limit_rank is None) or (fit_limit_rank is not None and last_evaluation > fit_limit_rank)) \
+                and ((max_epochs is None) or (max_epochs is not None and epoch_id < max_epochs)):
+
+            if (epoch_id % GradientDescentFitter.LOGGING_INTERVAL) == 0:
+                self.__logger.log('%% epoch #{ep_id}'.format(ep_id=epoch_id))
+            epoch_id += 1
+
+            if is_stochastic:
+                # shuffle samples
+                random.shuffle(x_values)
+
+            # run for series values
+            for x_t in x_values:
+                # get y_t
+                y_t = y_for_x[x_t]
+
+                # calculate gradient
+                gradient_values = self.__gradient_function(x_t, y_t, w_vector)
+
+                # calculate gamma_t
+                gamma_t = gamma_0 * np.square(np.log(t_counter))
+
+                # update w vector using gradient values
+                w_vector -= gamma_t * gradient_values
+
+                # increase t
+                t_counter += 1
+
+                # log current state
+                if (t_counter % GradientDescentFitter.LOGGING_INTERVAL) == 0:
+                    self.__logger.log('[t={t_counter}] >> status:\n'
+                                      'gamma_t: {gamma_t}\n'
+                                      'w: {w_vector}'.format(t_counter=t_counter, gamma_t=gamma_t, w_vector=w_vector))
+
+                    if plot_progress:
+                        eval_ax.clear()
+                        eval_ax.plot(evaluations)
+                        pyplot.pause(0.001)
+
+            # calculate target function value
+            if (epoch_id % GradientDescentFitter.EVALUATION_INTERVAL) == 0:
+                new_evaluation = self.__target_function(y_for_x, w_vector)
+                self.__logger.log('evaluation: {evaluation}'.format(evaluation=new_evaluation))
+                last_evaluation = new_evaluation
+                evaluations.append(last_evaluation)
+
+        # log learn statistics
+        self.__logger.log('epochs: {epoch_id}'.format(epoch_id=epoch_id))
+        self.__logger.log('updates: {update_id}'.format(update_id=t_counter))
+
+        # return learned params
+        return w_vector
