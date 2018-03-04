@@ -201,7 +201,7 @@ def get_synthetic_sigmoid_ts(L_param, a_param, length, y_t0, add_noise=False, sh
 
 
 def get_synthetic_sigmoid(l_param, a_param, c_param, length, add_noise=False, should_plot=False,
-                          x_range=None, y_range=None):
+                          x_range=None, y_range=None, train_part_factor=0.6):
     """
     return sigmoid series values.
 
@@ -234,6 +234,8 @@ def get_synthetic_sigmoid(l_param, a_param, c_param, length, add_noise=False, sh
     noise_amp = 0.05 * l_param
     x_step_size = (x_range[1]-x_range[0]) / length
     y_range_size = y_range[1] - y_range[0]
+    y_for_x_train = dict()
+    y_for_x_test = dict()
 
     for i in range(length):
         x_t = x_range[0] + i*x_step_size
@@ -246,6 +248,12 @@ def get_synthetic_sigmoid(l_param, a_param, c_param, length, add_noise=False, sh
         normalized_y_value = ((new_value / l_param) * y_range_size) + y_range[0]
         series_values = np.append(series_values, normalized_y_value)
 
+        # store in y_for_x_train form
+        if i < train_part_factor * length:
+            y_for_x_train[x_t] = normalized_y_value
+        else:
+            y_for_x_test[x_t] = normalized_y_value
+
     # ## plot
     # clear plot area
     if should_plot:
@@ -256,7 +264,7 @@ def get_synthetic_sigmoid(l_param, a_param, c_param, length, add_noise=False, sh
         pyplot.plot([x_range[0]+i*x_step_size for i in range(length)], series_values, '-r')
         pyplot.show()
 
-    return series_values
+    return y_for_x_train, y_for_x_test
 
 
 def get_inflection_point_of_sigmoid(series):
