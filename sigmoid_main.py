@@ -10,7 +10,7 @@ def generate_series(w_vector):
     l_param, a_param, c_param = w_vector
     x_range = [0, 1]
     y_range = [0, l_param]
-    series_length = 100
+    series_length = 30
     add_noise = False
     should_plot = False
 
@@ -87,7 +87,7 @@ def main():
 
     # load series
     logger.log('# load series..')
-    original_w_vector = np.array([10, -10, 70], dtype=np.float64)
+    original_w_vector = np.array([70, -10, 70], dtype=np.float64)
     train, test = generate_series(original_w_vector)
 
     # create fitter
@@ -97,7 +97,7 @@ def main():
     logger.log('# fit sigmoid params..')
     fitted_w_vector = \
         gd_fitter.fit_and_predict_gd_online(
-            train, len(original_w_vector), is_stochastic=True, fit_limit_rank=1e-2, plot_progress=True, gamma_0=1e-3,
+            train, len(original_w_vector), is_stochastic=True, fit_limit_rank=5e-2, plot_progress=True, gamma_0=1e-6,
             first_w=None    # todo: init with mean params
         )
 
@@ -105,6 +105,7 @@ def main():
     logger.log('fitted w vector: {fitted_vector}'.format(fitted_vector=fitted_w_vector))
 
     # predict next values
+    logger.log('# predict next values')
     # <offline>
     test_x_values = list(test.keys())
     predictions = get_sigmoid_predictions_for_values(test_x_values, fitted_w_vector)
@@ -112,11 +113,13 @@ def main():
     # <online>
 
     # calculate final rank (R^2, MSE, MAPE)
-    logger.log('final ranks: {metrics}'.format(
-        metrics=utils.get_all_metrics(
+    logger.log('# final ranks:')
+    utils.log_metrics_dict(
+        logger,
+        utils.get_all_metrics(
             series_a=[x[1] for x in sorted(test.items())],
             series_b=[x[1] for x in sorted(predictions.items())]
-        ))
+        )
     )
 
 

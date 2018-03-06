@@ -154,9 +154,12 @@ def plot_graph_and_prediction(original_series, predictions, prediction_start_ind
 
 def log_metrics_dict(logger, metrics):
     for metric_name in sorted(metrics.keys(), reverse=True):
-        if len(metrics[metric_name]) > 0:
-            avg_metric = sum(metrics[metric_name]) / len(metrics[metric_name])
-            logger.log('{key} : {avg_value}'.format(key=metric_name, avg_value=avg_metric))
+        if type(metrics[metric_name]) == list:
+            if len(metrics[metric_name]) > 0:
+                avg_metric = sum(metrics[metric_name]) / len(metrics[metric_name])
+                logger.log('{key} : {avg_value}'.format(key=metric_name, avg_value=avg_metric))
+        else:
+            logger.log('{key} : {metric_value}'.format(key=metric_name, metric_value=metrics[metric_name]))
 
 
 def get_synthetic_sigmoid_ts(L_param, a_param, length, y_t0, add_noise=False, should_plot=False):
