@@ -8,7 +8,7 @@ import utils
 def generate_series(w_vector):
     # define settings
     l_param, a_param, c_param = w_vector
-    x_range = [0, 1]
+    x_range = [1, 31]
     y_range = [0, l_param]
     series_length = 30
     add_noise = False
@@ -87,7 +87,8 @@ def main():
 
     # load series
     logger.log('# load series..')
-    original_w_vector = np.array([70, -10, 70], dtype=np.float64)
+    original_w_vector = np.array([70, -0.33, 70], dtype=np.float64)
+    initial_w_vector = np.array([60, -1, 80], dtype=np.float64)
     train, test = generate_series(original_w_vector)
 
     # create fitter
@@ -97,8 +98,8 @@ def main():
     logger.log('# fit sigmoid params..')
     fitted_w_vector = \
         gd_fitter.fit_and_predict_gd_online(
-            train, len(original_w_vector), is_stochastic=True, fit_limit_rank=5e-2, plot_progress=True, gamma_0=1e-6,
-            first_w=None    # todo: init with mean params
+            train, len(original_w_vector), is_stochastic=True, fit_limit_rank=5e-2, plot_progress=True, gamma_0=1e-7,
+            first_w=initial_w_vector, gamma_change_mode=GradientDescentFitter.GAMMA_INCREASING
         )
 
     logger.log('original w vector: {original_vector}'.format(original_vector=original_w_vector))
