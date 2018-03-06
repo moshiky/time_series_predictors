@@ -15,15 +15,22 @@ class GradientDescentFitter:
     GAMMA_INCREASING = 1
     GAMMA_DECREASING = 2
 
+    # evaluation plot mode
+    PLOT_ALL = 0
+    PLOT_RECENT = 1
+    RECENT_AMOUNT = 10
+
     def __init__(self, logger, target_function, gradient_function):
         self.__logger = logger
         self.__target_function = target_function
         self.__gradient_function = gradient_function
 
     def fit_and_predict_gd_online(self, y_for_x, w_size, is_stochastic=False, max_epochs=None, fit_limit_rank=None,
-                                  first_w=None, gamma_0=0.0001, plot_progress=True, gamma_change_mode=GAMMA_STATIC):
+                                  first_w=None, gamma_0=0.0001, plot_progress=True, gamma_change_mode=GAMMA_STATIC,
+                                  evaluation_plot_mode=PLOT_ALL):
         """
         fits using stochastic gradient descent method
+        :param evaluation_plot_mode:
         :param gamma_change_mode:
         :param plot_progress:
         :param gamma_0:
@@ -123,7 +130,16 @@ class GradientDescentFitter:
 
                     if plot_progress:
                         eval_ax.clear()
-                        eval_ax.plot(evaluations)
+
+                        if evaluation_plot_mode == GradientDescentFitter.PLOT_ALL:
+                            eval_ax.plot(evaluations)
+                        else:   # evaluation_plot_mode == GradientDescentFitter.PLOT_RECENT:
+                            evaluation_amount = len(evaluations)
+                            first_index = 1 + max(0, evaluation_amount-GradientDescentFitter.RECENT_AMOUNT)
+                            indexes = \
+                                list(range(first_index, evaluation_amount+1))
+                            eval_ax.plot(indexes, evaluations[-GradientDescentFitter.RECENT_AMOUNT:])
+
                         pyplot.pause(0.001)
 
             # calculate target function value
