@@ -1,4 +1,5 @@
 
+import math
 from matplotlib import pyplot
 import random
 import numpy as np
@@ -7,7 +8,12 @@ import numpy as np
 class GradientDescentFitter:
 
     LOGGING_INTERVAL = 10000    # updates
-    EVALUATION_INTERVAL = 100   # epochs
+    EVALUATION_INTERVAL = 1000  # epochs
+
+    # gamma modes consts
+    GAMMA_STATIC = 0
+    GAMMA_INCREASING = 1
+    GAMMA_DECREASING = 2
 
     def __init__(self, logger, target_function, gradient_function):
         self.__logger = logger
@@ -15,9 +21,10 @@ class GradientDescentFitter:
         self.__gradient_function = gradient_function
 
     def fit_and_predict_gd_online(self, y_for_x, w_size, is_stochastic=False, max_epochs=None, fit_limit_rank=None,
-                                  first_w=None, gamma_0=0.0001, plot_progress=True):
+                                  first_w=None, gamma_0=0.0001, plot_progress=True, gamma_change_mode=GAMMA_STATIC):
         """
         fits using stochastic gradient descent method
+        :param gamma_change_mode:
         :param plot_progress:
         :param gamma_0:
         :param y_for_x:
@@ -87,9 +94,22 @@ class GradientDescentFitter:
                 gradient_values = self.__gradient_function(x_t, y_t, w_vector)
 
                 # calculate gamma_t
-                gamma_t = gamma_0 * np.square(np.log(t_counter))
+                if gamma_change_mode == GradientDescentFitter.GAMMA_STATIC:
+                    gamma_t = gamma_0
+                elif gamma_change_mode == GradientDescentFitter.GAMMA_INCREASING:
+                    gamma_t = gamma_0 * np.square(np.log(t_counter))
+                elif gamma_change_mode == GradientDescentFitter.GAMMA_DECREASING:
+                    gamma_t = gamma_0 / t_counter
+                else:
+                    raise Exception('gamma mode not supported')
 
                 # update w vector using gradient values
+                if any(map(math.isnan, gradient_values)):
+                    self.__logger.log('last w: {last_w}'.format(last_w=w_vector))
+                    self.__logger.log('last gamma: {gamma_t}'.format(gamma_t=gamma_t))
+                    self.__logger.log('gradient values: {gradient_values}'.format(gradient_values=gradient_values))
+                    raise Exception('nan param values reached')
+
                 w_vector -= gamma_t * gradient_values
 
                 # increase t
@@ -111,6 +131,9 @@ class GradientDescentFitter:
                 new_evaluation = self.__target_function(y_for_x, w_vector)
                 self.__logger.log('evaluation: {evaluation}'.format(evaluation=new_evaluation))
                 last_evaluation = new_evaluation
+                if math.isnan(last_evaluation):
+                    raise Exception('nan evaluation')
+
                 evaluations.append(last_evaluation)
 
         # log learn statistics
