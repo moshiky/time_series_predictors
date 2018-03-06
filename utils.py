@@ -36,12 +36,6 @@ def parse_csv(file_path, should_shuffle=True, smoothing_level=0):
                         last_change_index = i
 
     return record_list
-    # return [
-    #     [1.5, 2, 3.5, 6, 10.25, 17.5, 29.875, 51, 87.0625, 148.625, 253.71875, 433.125, 739.390625, 1262.21875],
-    #     [1.5, 3.4, 0.98, 3.982, 0.7778, 4.70062, 0.463298, 5.5944142, -0.00348382, 6.713645422, -0.675545126, 8.123929019, -1.623047053, 9.911019528],
-    #     [-1.1, -2, -5.3, -11.25, -28.415, -62.5825, -153.47575, -345.842625, -832.8670375, -1903.556806, -4533.106664, -10451.8476, -24718.28246, -57302.0859]
-    # ]
-
 
 def split_list(samples, test_percentage=Consts.TEST_SIZE_FACTOR):
     test_samples_count = int(len(samples) * test_percentage)
@@ -162,7 +156,7 @@ def log_metrics_dict(logger, metrics):
             logger.log('{key} : {metric_value}'.format(key=metric_name, metric_value=metrics[metric_name]))
 
 
-def get_synthetic_sigmoid_ts(L_param, a_param, length, y_t0, add_noise=False, should_plot=False):
+def get_synthetic_sigmoid_ts(l_param, a_param, length, y_t0, add_noise=False, should_plot=False):
     """
     return sigmoid series values.
 
@@ -172,7 +166,7 @@ def get_synthetic_sigmoid_ts(L_param, a_param, length, y_t0, add_noise=False, sh
 
     :param add_noise:
     :param should_plot:
-    :param L_param:
+    :param l_param:
     :param a_param:
     :param length:
     :param y_t0:
@@ -183,7 +177,7 @@ def get_synthetic_sigmoid_ts(L_param, a_param, length, y_t0, add_noise=False, sh
     for i in range(length):
         y_t = series_values[-1]
         e_a = np.exp(a_param)
-        new_value = (L_param * y_t) / (y_t + e_a * (L_param - y_t))
+        new_value = (l_param * y_t) / (y_t + e_a * (l_param - y_t))
 
         if add_noise:
             new_value += (-1.0 + 2 * random.random())
