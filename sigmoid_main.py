@@ -6,37 +6,42 @@ import utils
 
 
 def get_mean_h_index_graph():
-    y_for_x = {
+    y_for_x_train = {
         1: 1.038427771, 2: 1.228371716, 3: 1.522827041, 4: 1.848247451, 5: 2.196933883,
         6: 2.560174242, 7:2.948740461, 8: 3.357871277, 9: 3.789862903, 10: 4.245053015,
         11: 4.714898359, 12: 5.210474775, 13: 5.71287229, 14: 6.24127102, 15: 6.765482542,
-        16: 7.3025596, 17: 7.851995678, 18: 8.402275951, 19: 8.945026001, 20: 9.44381036,
+        16: 7.3025596, 17: 7.851995678, 18: 8.402275951, 19: 8.945026001, 20: 9.44381036
+    }
+
+    y_for_x_test = {
         21: 9.890896198, 22: 10.24885209, 23: 10.59303554, 24: 10.93647228, 25: 11.23032671,
         26: 11.5080625, 27: 11.79206063, 28: 12.04333498, 29: 12.26126475, 30: 12.41589939
     }
-    return y_for_x
+
+    return y_for_x_train, y_for_x_test
 
 
 def generate_series(w_vector):
-    # define settings
-    l_param, a_param, c_param = w_vector
-    x_range = [1, 31]
-    y_range = [0, l_param]
-    series_length = 30
-    add_noise = False
-    should_plot = False
-
-    # generate and return series
-    return utils.get_synthetic_sigmoid(
-        l_param=l_param,
-        a_param=a_param,
-        c_param=c_param,
-        x_range=x_range,
-        y_range=y_range,
-        length=series_length,
-        add_noise=add_noise,
-        should_plot=should_plot
-    )
+    # # define settings
+    # l_param, a_param, c_param = w_vector
+    # x_range = [1, 31]
+    # y_range = [0, l_param]
+    # series_length = 30
+    # add_noise = False
+    # should_plot = False
+    #
+    # # generate and return series
+    # return utils.get_synthetic_sigmoid(
+    #     l_param=l_param,
+    #     a_param=a_param,
+    #     c_param=c_param,
+    #     x_range=x_range,
+    #     y_range=y_range,
+    #     length=series_length,
+    #     add_noise=add_noise,
+    #     should_plot=should_plot
+    # )
+    return get_mean_h_index_graph()
 
 
 def get_mean_error_rate(y_for_x, w_vector):
