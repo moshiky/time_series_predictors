@@ -104,9 +104,9 @@ class GradientDescentFitter:
                 if gamma_change_mode == GradientDescentFitter.GAMMA_STATIC:
                     gamma_t = gamma_0
                 elif gamma_change_mode == GradientDescentFitter.GAMMA_INCREASING:
-                    gamma_t = gamma_0 * np.square(np.log(t_counter))
+                    gamma_t = gamma_0 * np.log(t_counter)
                 elif gamma_change_mode == GradientDescentFitter.GAMMA_DECREASING:
-                    gamma_t = gamma_0 / t_counter
+                    gamma_t = gamma_0 / np.sqrt(t_counter)
                 else:
                     raise Exception('gamma mode not supported')
 
