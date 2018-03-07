@@ -105,7 +105,7 @@ def main():
     # load series
     logger.log('# load series..')
     original_w_vector = np.array([15, -0.17, 11], dtype=np.float64)
-    initial_w_vector = np.array([10, -1, 14], dtype=np.float64)
+    initial_w_vector = np.array([12.05, -0.18, 12.04], dtype=np.float64)
     train, test = generate_series(original_w_vector)
 
     # create fitter
@@ -115,12 +115,12 @@ def main():
     logger.log('# fit sigmoid params..')
     fitted_w_vector = \
         gd_fitter.fit_and_predict_gd_online(
-            train, len(original_w_vector), is_stochastic=True, fit_limit_rank=5e-2, plot_progress=True, gamma_0=1e-6,
-            first_w=initial_w_vector, gamma_change_mode=GradientDescentFitter.GAMMA_INCREASING,
+            train, len(initial_w_vector), is_stochastic=True, fit_limit_rank=1e-2, plot_progress=True, gamma_0=1e-5,
+            first_w=initial_w_vector, gamma_change_mode=GradientDescentFitter.GAMMA_DECREASING,
             evaluation_plot_mode=GradientDescentFitter.PLOT_RECENT
         )
 
-    logger.log('original w vector: {original_vector}'.format(original_vector=original_w_vector))
+    logger.log('initial w vector: {original_vector}'.format(original_vector=initial_w_vector))
     logger.log('fitted w vector: {fitted_vector}'.format(fitted_vector=fitted_w_vector))
 
     # predict next values
