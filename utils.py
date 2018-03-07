@@ -37,6 +37,7 @@ def parse_csv(file_path, should_shuffle=True, smoothing_level=0):
 
     return record_list
 
+
 def split_list(samples, test_percentage=Consts.TEST_SIZE_FACTOR):
     test_samples_count = int(len(samples) * test_percentage)
     return samples[:-test_samples_count], samples[-test_samples_count:]
@@ -208,6 +209,7 @@ def get_synthetic_sigmoid(l_param, a_param, c_param, length, add_noise=False, sh
 
     x = 1, 2, ...
 
+    :param train_part_factor:
     :param y_range:
     :param x_range:
     :param c_param:
