@@ -124,7 +124,8 @@ def calc_mid_end_rate(data_records):
     }
 
 
-def plot_graph_and_prediction(original_series, predictions, prediction_start_index, file_name):
+def plot_graph_and_prediction(original_series, predictions, prediction_start_index, file_name,
+                              fitted_values=None, store=True, show=False):
     # clear plot area
     pyplot.clf()
     pyplot.grid(which='both')
@@ -137,14 +138,29 @@ def plot_graph_and_prediction(original_series, predictions, prediction_start_ind
     )
 
     # plot prediction
-    # pyplot.plot(
-    #     list(range(prediction_start_index, prediction_start_index + len(predictions))),
-    #     predictions,
-    #     '.b'
-    # )
+    if fitted_values is not None and predictions is not None:
+        pyplot.plot(
+            list(range(1, len(fitted_values)+1)), fitted_values, '.b'
+        )
+        pyplot.plot(
+            list(range(prediction_start_index, prediction_start_index + len(predictions))),
+            predictions,
+            '.g'
+        )
+
+    elif predictions is not None:
+        pyplot.plot(
+            list(range(prediction_start_index, prediction_start_index + len(predictions))),
+            predictions,
+            '.b'
+        )
+
+    if show:
+        pyplot.show()
 
     # store plotted graph
-    pyplot.savefig(r'output/{file_name}.png'.format(file_name=file_name))
+    if store:
+        pyplot.savefig(r'output/{file_name}.png'.format(file_name=file_name))
 
 
 def log_metrics_dict(logger, metrics):
@@ -277,3 +293,31 @@ def get_inflection_point_of_sigmoid(series):
         last_slope = current_slope
 
     return None
+
+
+def load_dataset_for_gd_fitting(file_path, series_length, test_size):
+    # load csv
+    dataset_records = parse_csv(file_path, should_shuffle=False, smoothing_level=1)
+
+    # split to train and test groups - each is list of y_for_x dicts
+    dataset_splitted = list()
+    for series in dataset_records:
+        if len(series) < series_length:
+            continue
+
+        # split series
+        train_set_size = series_length - test_size
+
+        # convert series to y_for_x format
+        train_y_for_x = {
+            i + 1: series[i] for i in range(train_set_size)
+        }
+        test_y_for_x = {
+            i + 1: series[i] for i in range(train_set_size, series_length)
+        }
+
+        # store splitted dicts
+        dataset_splitted.append((train_y_for_x, test_y_for_x))
+
+    # return found sets
+    return dataset_splitted

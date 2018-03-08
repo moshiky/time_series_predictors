@@ -19,11 +19,21 @@ class GradientDescentFitter:
     PLOT_ALL = 0
     PLOT_RECENT = 1
     RECENT_AMOUNT = 10
+    STOP_LEARNING_INTERVAL = 1e-4
 
     def __init__(self, logger, target_function, gradient_function):
         self.__logger = logger
         self.__target_function = target_function
         self.__gradient_function = gradient_function
+
+    @staticmethod
+    def __is_learning_stopped(evaluations):
+        if len(evaluations) < GradientDescentFitter.RECENT_AMOUNT:
+            return False
+
+        values_to_consider = evaluations[-GradientDescentFitter.RECENT_AMOUNT:]
+        recent_avg = sum(values_to_consider) / len(values_to_consider)
+        return abs(recent_avg - evaluations[-1]) < GradientDescentFitter.STOP_LEARNING_INTERVAL
 
     def fit_and_predict_gd_online(self, y_for_x, w_size, is_stochastic=False, max_epochs=None, fit_limit_rank=None,
                                   first_w=None, gamma_0=0.0001, plot_progress=True, gamma_change_mode=GAMMA_STATIC,
@@ -50,7 +60,7 @@ class GradientDescentFitter:
 
         # initiate w vector
         if first_w is not None:
-            w_vector = first_w
+            w_vector = np.array(first_w)
         else:
             w_vector = np.random.rand(w_size)
 
@@ -59,7 +69,7 @@ class GradientDescentFitter:
         gamma_0 = np.float64(gamma_0)
 
         # log initial params
-        self.__logger.log('initial params: w={w_vector}, gamma_0={gamma_0}'.format(w_vector=w_vector, gamma_0=gamma_0))
+        # self.__logger.log('initial params: w={w_vector}, gamma_0={gamma_0}'.format(w_vector=w_vector, gamma_0=gamma_0))
 
         # initiate progress logging
         evaluations = list()
@@ -82,10 +92,11 @@ class GradientDescentFitter:
 
         # for i in range(epochs):
         while ((fit_limit_rank is None) or (fit_limit_rank is not None and last_evaluation > fit_limit_rank)) \
-                and ((max_epochs is None) or (max_epochs is not None and epoch_id < max_epochs)):
+                and ((max_epochs is None) or (max_epochs is not None and epoch_id < max_epochs))\
+                and not GradientDescentFitter.__is_learning_stopped(evaluations):
 
-            if (epoch_id % GradientDescentFitter.LOGGING_INTERVAL) == 0:
-                self.__logger.log('%% epoch #{ep_id}'.format(ep_id=epoch_id))
+            # if (epoch_id % GradientDescentFitter.LOGGING_INTERVAL) == 0:
+            #     self.__logger.log('%% epoch #{ep_id}'.format(ep_id=epoch_id))
             epoch_id += 1
 
             if is_stochastic:
@@ -124,9 +135,9 @@ class GradientDescentFitter:
 
                 # log current state
                 if (t_counter % GradientDescentFitter.LOGGING_INTERVAL) == 0:
-                    self.__logger.log('[t={t_counter}] >> status:\n'
-                                      'gamma_t: {gamma_t}\n'
-                                      'w: {w_vector}'.format(t_counter=t_counter, gamma_t=gamma_t, w_vector=w_vector))
+                    # self.__logger.log('[t={t_counter}] >> status:\n'
+                    #                   'gamma_t: {gamma_t}\n'
+                    #                   'w: {w_vector}'.format(t_counter=t_counter, gamma_t=gamma_t, w_vector=w_vector))
 
                     if plot_progress:
                         eval_ax.clear()
@@ -145,7 +156,7 @@ class GradientDescentFitter:
             # calculate target function value
             if (epoch_id % GradientDescentFitter.EVALUATION_INTERVAL) == 0:
                 new_evaluation = self.__target_function(y_for_x, w_vector)
-                self.__logger.log('evaluation: {evaluation}'.format(evaluation=new_evaluation))
+                # self.__logger.log('evaluation: {evaluation}'.format(evaluation=new_evaluation))
                 last_evaluation = new_evaluation
                 if math.isnan(last_evaluation):
                     raise Exception('nan evaluation')
@@ -153,8 +164,12 @@ class GradientDescentFitter:
                 evaluations.append(last_evaluation)
 
         # log learn statistics
+        self.__logger.log('evaluation: {evaluation}'.format(evaluation=self.__target_function(y_for_x, w_vector)))
         self.__logger.log('epochs: {epoch_id}'.format(epoch_id=epoch_id))
         self.__logger.log('updates: {update_id}'.format(update_id=t_counter))
+
+        # end figure
+        pyplot.close('all')
 
         # return learned params
         return w_vector
