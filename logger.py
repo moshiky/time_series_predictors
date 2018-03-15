@@ -1,10 +1,11 @@
 
+from singleton import Singleton
 import os
 import time
 import threading
 
 
-class Logger:
+class Logger(metaclass=Singleton):
 
     def __init__(self):
         self.__log_file_name = \

@@ -1,16 +1,29 @@
 
+import multiprocessing
+from multiprocessing import Pool as ThreadPool
 import numpy as np
 from gradient_descent_fitter import GradientDescentFitter
 from logger import Logger
 import utils
+from graph_manager import GraphManager
+from statistics_manager import StatisticsManager
+import sigmoid_fuctions_v2
 
 
 H_INDEX_CSV_FILE_PATH = r'datasets/author_h_index.csv'
+GRAPH_OUTPUT_FOLDER_PATH = 'output'
 MEAN_H_INDEX_GRAPH_PARAMS = np.array([12.05, -0.18, 12.04], dtype=np.float64)
 SERIES_LENGTH = 25
-TEST_SIZE = 15
-ONLINE_EPOCHS = 100
+TEST_SIZE = 10
+ONLINE_EPOCHS = 5000
 IS_ONLINE = True
+MAX_PROCESSES = 2
+LAG_SIZE = 1
+DATASET_SIZE = 10
+
+lock = multiprocessing.Lock()
+graph_manager = GraphManager(GRAPH_OUTPUT_FOLDER_PATH)
+statistics_manager = StatisticsManager()
 
 
 def get_mean_h_index_graph():
@@ -112,11 +125,12 @@ def get_sigmoid_predictions_for_values(x_values, w_vector):
     return y_for_x
 
 
-def fit(fitter, y_for_x, initial_w_vector, epochs=None):
+def fit(fitter, y_for_x, initial_w_vector, epochs=None, gamma_change_mode=GradientDescentFitter.GAMMA_INCREASING,
+        gamma_0=1e-6):
     fitted_w_vector = \
         fitter.fit_and_predict_gd_online(
-            y_for_x, len(initial_w_vector), is_stochastic=True, fit_limit_rank=5e-2, plot_progress=False, gamma_0=1e-6,
-            first_w=initial_w_vector, gamma_change_mode=GradientDescentFitter.GAMMA_INCREASING,
+            y_for_x, len(initial_w_vector), is_stochastic=True, fit_limit_rank=5e-3, plot_progress=False,
+            first_w=initial_w_vector, gamma_change_mode=gamma_change_mode, gamma_0=gamma_0,
             evaluation_plot_mode=GradientDescentFitter.PLOT_RECENT, max_epochs=epochs
         )
     return fitted_w_vector
@@ -132,20 +146,27 @@ def fit_mean_h_index_graph():
     train, test = generate_series()
 
     # create fitter
-    gd_fitter = GradientDescentFitter(logger, target_function=get_mean_error_rate, gradient_function=get_gradient)
+    gd_fitter = \
+        GradientDescentFitter(
+            logger,
+            target_function=sigmoid_fuctions_v2.get_mean_error_rate,
+            gradient_function=sigmoid_fuctions_v2.get_gradient
+        )
 
     # fit sigmoid params using gradient descent
     logger.log('# fit sigmoid params..')
-    fitted_w_vector = fit(gd_fitter, train, MEAN_H_INDEX_GRAPH_PARAMS)
+    initial_w_vector = np.array([0.49937523, 0.89339831, 0.08601164, -0.22586464, 0.43639608])
+    fitted_w_vector = fit(gd_fitter, train, initial_w_vector, gamma_change_mode=GradientDescentFitter.GAMMA_DECREASING,
+                          gamma_0=1e-4)
 
-    logger.log('initial w vector: {original_vector}'.format(original_vector=MEAN_H_INDEX_GRAPH_PARAMS))
+    logger.log('initial w vector: {original_vector}'.format(original_vector=initial_w_vector))
     logger.log('fitted w vector: {fitted_vector}'.format(fitted_vector=fitted_w_vector))
 
     # predict next values
     logger.log('# predict next values')
     # <offline>
     test_x_values = list(test.keys())
-    predictions = get_sigmoid_predictions_for_values(test_x_values, fitted_w_vector)
+    predictions = sigmoid_fuctions_v2.get_sigmoid_predictions_for_values(test_x_values, fitted_w_vector)
 
     # <online>
 
@@ -160,6 +181,113 @@ def fit_mean_h_index_graph():
     )
 
 
+def fit_online_thread_func(sample_sets, record_index):
+    # get loggers
+    logger = Logger()
+
+    # create fitter
+    # gd_fitter = GradientDescentFitter(logger, target_function=get_mean_error_rate, gradient_function=get_gradient)
+    gd_fitter = \
+        GradientDescentFitter(
+            logger,
+            target_function=sigmoid_fuctions_v2.get_mean_error_rate,
+            gradient_function=sigmoid_fuctions_v2.get_gradient
+        )
+
+    # extract data sets
+    train_set, test_set = sample_sets
+
+    # log record index
+    logger.log('record #{record_index}'.format(record_index=record_index))
+    test_x_values = list(test_set.keys())
+
+    # fit first params
+    history = dict(train_set)
+    # last_fitted_w_vector = fit(gd_fitter, history, MEAN_H_INDEX_GRAPH_PARAMS)
+    try:
+        last_fitted_w_vector = \
+            fit(gd_fitter, history, sigmoid_fuctions_v2.INITIAL_W_VECTOR, gamma_0=1e-3,
+                gamma_change_mode=GradientDescentFitter.GAMMA_DECREASING)
+    except Exception as ex:
+        logger.log('ERROR: {ex}'.format(ex=ex))
+        return None
+
+    # calculate initial fitted values
+    fitted_values = \
+        sigmoid_fuctions_v2.get_sigmoid_predictions_for_values(
+            list(range(1, min(test_x_values))), last_fitted_w_vector
+        )
+
+    # predict test values in online mode
+    predictions = dict()
+    for i in range(len(test_x_values)):
+        # predict next
+        x_t = test_x_values[i]
+        predictions[x_t] = sigmoid_fuctions_v2.get_sigmoid_prediction(x_t, last_fitted_w_vector)
+
+        # add observation to history
+        history[x_t] = test_set[x_t]
+
+        # remove oldest observations
+        while len(history) > LAG_SIZE:
+            oldest_xt = min(history.keys())
+            history.pop(oldest_xt)
+
+        # fit on history
+        try:
+            last_fitted_w_vector = fit(gd_fitter, history, last_fitted_w_vector, epochs=ONLINE_EPOCHS,
+                                       gamma_0=1e-5,
+                                       gamma_change_mode=GradientDescentFitter.GAMMA_DECREASING)
+        except Exception as ex:
+            logger.log('ERROR: {ex}'.format(ex=ex))
+            return None
+
+    # calculate final rank (R^2, MSE, MAPE)
+    metrics = utils.get_all_metrics(
+        series_a=[x[1] for x in sorted(test_set.items())],
+        series_b=[x[1] for x in sorted(predictions.items())]
+    )
+    # statistics_manager.add_metrics(metrics)
+    with lock:
+        statistics_manager.write_to_csv(metrics)
+        logger.log('fitting ranks:')
+        utils.log_metrics_dict(logger, metrics)
+
+        # plot graph
+        graph_manager.plot_graph_and_prediction(
+            original_series=list(train_set.values()) + list(test_set.values()),
+            fitted_values=list(fitted_values.values()),
+            predictions=list(predictions.values()),
+            prediction_start_index=len(train_set) + 1,
+            file_name='sigmoid_{record_index}'.format(record_index=record_index),
+            store=True,
+            show=False
+        )
+
+
+def fit_online(dataset):
+    # get logger
+    logger = Logger()
+
+    # create thread pool
+    thread_pool = ThreadPool(processes=MAX_PROCESSES)
+
+    # fit all series in parallel
+    logger.log('start parallel fitting..')
+    thread_pool.starmap(
+        fit_online_thread_func,
+        [[dataset[i], i] for i in range(len(dataset))]
+    )
+    thread_pool.close()
+    thread_pool.join()
+    logger.log('parallel fitting completed')
+
+    # log average performance
+    logger.log('## average overall ranks:')
+    # utils.log_metrics_dict(logger, statistics_manager.get_average_metrics())
+    utils.log_metrics_dict(logger, statistics_manager.get_avg_from_csv())
+
+
 def calculate_dataset_mean_scores():
     # create logger
     logger = Logger()
@@ -167,26 +295,29 @@ def calculate_dataset_mean_scores():
     # load series
     logger.log('# load dataset..')
     dataset = utils.load_dataset_for_gd_fitting(H_INDEX_CSV_FILE_PATH, SERIES_LENGTH, TEST_SIZE)
+    if DATASET_SIZE is not None:
+        dataset = dataset[:DATASET_SIZE]
+
     logger.log('dataset size: {num_records}'.format(num_records=len(dataset)))
 
-    # create fitter
-    gd_fitter = GradientDescentFitter(logger, target_function=get_mean_error_rate, gradient_function=get_gradient)
+    if IS_ONLINE:
+        fit_online(dataset)
 
-    # fit sigmoid params using gradient descent
-    logger.log('# fit all series..')
-    figure_index = 0
-    metric_counters = dict()
-    for train_set, test_set in dataset[:20]:
-        logger.log('## record #{figure_index}'.format(figure_index=figure_index))
-        test_x_values = list(test_set.keys())
+    else:
+        # create fitter
+        gd_fitter = GradientDescentFitter(logger, target_function=get_mean_error_rate, gradient_function=get_gradient)
 
-        # # plot full graph
-        full_series_values = list(train_set.values()) + list(test_set.values())
-        # utils.plot_graph_and_prediction(
-        #     list(train_set.values()) + list(test_set.values()), None, 0, '', store=False, show=True
-        # )
+        # fit sigmoid params using gradient descent
+        logger.log('# fit all series..')
+        figure_index = 0
+        metric_counters = dict()
+        for train_set, test_set in dataset:
+            logger.log('## record #{figure_index}'.format(figure_index=figure_index))
+            test_x_values = list(test_set.keys())
 
-        if not IS_ONLINE:
+            # # plot full graph
+            full_series_values = list(train_set.values()) + list(test_set.values())
+
             # ## <offline>
             # fit w vector
             fitted_w_vector = fit(gd_fitter, train_set, MEAN_H_INDEX_GRAPH_PARAMS)
@@ -197,58 +328,35 @@ def calculate_dataset_mean_scores():
             fitted_values = get_sigmoid_predictions_for_values(list(range(1, min(test_x_values))), fitted_w_vector)
             predictions = get_sigmoid_predictions_for_values(test_x_values, fitted_w_vector)
 
-        else:
-            # ## <online>
-            # fit first params
-            history = dict(train_set)
-            last_fitted_w_vector = fit(gd_fitter, history, MEAN_H_INDEX_GRAPH_PARAMS)
+            # calculate final rank (R^2, MSE, MAPE)
+            logger.log('final ranks:')
+            metrics = utils.get_all_metrics(
+                    series_a=[x[1] for x in sorted(test_set.items())],
+                    series_b=[x[1] for x in sorted(predictions.items())]
+                )
+            utils.log_metrics_dict(logger, metrics)
 
-            # calculate initial fitted values
-            fitted_values = \
-                get_sigmoid_predictions_for_values(list(range(1, min(test_x_values))), last_fitted_w_vector)
-
-            # predict test values in online mode
-            predictions = dict()
-            for i in range(len(test_x_values)):
-                # predict next
-                x_t = test_x_values[i]
-                predictions[x_t] = get_sigmoid_prediction(x_t, last_fitted_w_vector)
-
-                # add observation to history
-                history[x_t] = test_set[x_t]
-
-                # fit on history
-                last_fitted_w_vector = fit(gd_fitter, history, last_fitted_w_vector, epochs=ONLINE_EPOCHS)
-
-        # calculate final rank (R^2, MSE, MAPE)
-        logger.log('final ranks:')
-        metrics = utils.get_all_metrics(
-                series_a=[x[1] for x in sorted(test_set.items())],
-                series_b=[x[1] for x in sorted(predictions.items())]
+            # plot graph
+            GraphManager(GRAPH_OUTPUT_FOLDER_PATH).plot_graph_and_prediction(
+                original_series=full_series_values,
+                fitted_values=list(fitted_values.values()),
+                predictions=list(predictions.values()),
+                prediction_start_index=len(train_set)+1,
+                file_name='sigmoid_{id}.png'.format(id=figure_index),
+                store=True,
+                show=False
             )
-        utils.log_metrics_dict(logger, metrics)
+            figure_index += 1
 
-        # plot graph
-        utils.plot_graph_and_prediction(
-            original_series=full_series_values,
-            fitted_values=list(fitted_values.values()),
-            predictions=list(predictions.values()),
-            prediction_start_index=len(train_set)+1,
-            file_name='sigmoid_{id}.png'.format(id=figure_index),
-            store=True,
-            show=False
-        )
-        figure_index += 1
+            # add to metric counters
+            for metric_name in metrics.keys():
+                if metric_name not in metric_counters.keys():
+                    metric_counters[metric_name] = list()
+                metric_counters[metric_name].append(metrics[metric_name])
 
-        # add to metric counters
+        # log average metrics
         logger.log('## average overall ranks:')
-        for metric_name in metrics.keys():
-            if metric_name not in metric_counters.keys():
-                metric_counters[metric_name] = list()
-            metric_counters[metric_name].append(metrics[metric_name])
-
-    # log average metrics
-    utils.log_metrics_dict(logger, metric_counters)
+        utils.log_metrics_dict(logger, metric_counters)
 
 
 if __name__ == '__main__':

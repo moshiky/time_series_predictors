@@ -52,7 +52,6 @@ class GradientDescentFitter:
         :param first_w:
         :return:
         """
-
         if max_epochs is None and fit_limit_rank is None:
             raise Exception('must define epochs or fit_limit_rank, or both')
 
@@ -69,7 +68,7 @@ class GradientDescentFitter:
         gamma_0 = np.float64(gamma_0)
 
         # log initial params
-        # self.__logger.log('initial params: w={w_vector}, gamma_0={gamma_0}'.format(w_vector=w_vector, gamma_0=gamma_0))
+        self.__logger.log('initial params: w={w_vector}, gamma_0={gamma_0}'.format(w_vector=w_vector, gamma_0=gamma_0))
 
         # initiate progress logging
         evaluations = list()
@@ -77,9 +76,9 @@ class GradientDescentFitter:
         evaluations.append(last_evaluation)
         self.__logger.log('initial evaluation: {evaluation}'.format(evaluation=last_evaluation))
 
-        eval_fig = pyplot.figure()
-        eval_ax = eval_fig.add_subplot(1, 1, 1)
         if plot_progress:
+            eval_fig = pyplot.figure()
+            eval_ax = eval_fig.add_subplot(1, 1, 1)
             eval_ax.plot(evaluations)
             pyplot.show(block=False)
 

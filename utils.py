@@ -124,53 +124,9 @@ def calc_mid_end_rate(data_records):
     }
 
 
-def plot_graph_and_prediction(original_series, predictions, prediction_start_index, file_name,
-                              fitted_values=None, store=True, show=False):
-    # clear plot area
-    pyplot.clf()
-    pyplot.grid(which='both')
-
-    # plot original series
-    pyplot.plot(
-        list(range(1, len(original_series)+1)),
-        original_series,
-        '-r'
-    )
-
-    # plot prediction
-    if fitted_values is not None and predictions is not None:
-        pyplot.plot(
-            list(range(1, len(fitted_values)+1)), fitted_values, '.b'
-        )
-        pyplot.plot(
-            list(range(prediction_start_index, prediction_start_index + len(predictions))),
-            predictions,
-            '.g'
-        )
-
-    elif predictions is not None:
-        pyplot.plot(
-            list(range(prediction_start_index, prediction_start_index + len(predictions))),
-            predictions,
-            '.b'
-        )
-
-    if show:
-        pyplot.show()
-
-    # store plotted graph
-    if store:
-        pyplot.savefig(r'output/{file_name}.png'.format(file_name=file_name))
-
-
 def log_metrics_dict(logger, metrics):
     for metric_name in sorted(metrics.keys(), reverse=True):
-        if type(metrics[metric_name]) == list:
-            if len(metrics[metric_name]) > 0:
-                avg_metric = sum(metrics[metric_name]) / len(metrics[metric_name])
-                logger.log('{key} : {avg_value}'.format(key=metric_name, avg_value=avg_metric))
-        else:
-            logger.log('{key} : {metric_value}'.format(key=metric_name, metric_value=metrics[metric_name]))
+        logger.log('{key} : {metric_value}'.format(key=metric_name, metric_value=metrics[metric_name]))
 
 
 def get_synthetic_sigmoid_ts(l_param, a_param, length, y_t0, add_noise=False, should_plot=False):
