@@ -3,14 +3,15 @@ import utils
 from arma_model import ARMAModel
 from sigmoid_curve import SigmoidCurve
 from logger import Logger
+import time
 
 
 DATASET_FILE_PATH = r'datasets/author_h_index.csv'
 LAG_SIZE = 0
-INITIAL_HISTORY_SIZE = 10
-NUMBER_OF_PREDICTIONS_AHEAD = 15
+INITIAL_HISTORY_SIZE = 15
+NUMBER_OF_PREDICTIONS_AHEAD = 10
 LOGGING_INTERVAL = 100
-SHOULD_PLOT = True
+SHOULD_PLOT = False
 IS_ONLINE = False
 
 
@@ -24,9 +25,11 @@ def predict_using_online_mode(
 
     # define min error storage
     model_error_metrics = dict()
+    valids_counter = 0
 
     # make predictions for each record
     logger.log('** ARMA settings: p={p}, q={q}'.format(p=ar_order, q=ma_order))
+    start_time = time.time()
     for record_index in range(len(data_records)):
         if (record_index % LOGGING_INTERVAL) == 0:
             logger.log('-- record #{record_index}'.format(record_index=record_index))
@@ -36,8 +39,9 @@ def predict_using_online_mode(
         # run ARMA model
         arma_model = ARMAModel(logger, p=ar_order, q=ma_order, lag_size=lag_size)
 
+        predictions = '<not initialized>'
         try:
-            error_metrics = \
+            test, predictions = \
                 arma_model.predict(
                     current_sample,
                     initial_history_size,
@@ -48,16 +52,23 @@ def predict_using_online_mode(
                     should_plot=SHOULD_PLOT,
                     record_id=record_index
                 )
+            error_metrics = utils.get_all_metrics(test, predictions)
 
         except Exception as ex:
-            logger.log(ex, should_print=False)
+            if 'Not enough info' not in str(ex):
+                logger.log(ex)
+                logger.log('series: {ser}'.format(ser=current_sample))
+                logger.log('predictions: {preds}'.format(preds=predictions))
             continue
 
         for metric_name in error_metrics.keys():
             if metric_name not in model_error_metrics.keys():
                 model_error_metrics[metric_name] = list()
             model_error_metrics[metric_name].append(error_metrics[metric_name])
+        valids_counter += 1
 
+    logger.log('total valid predictions: {valid_predictions}'.format(valid_predictions=valids_counter))
+    logger.log('total time: {total_secs} secs'.format(total_secs=time.time()-start_time))
     return model_error_metrics
 
 
@@ -77,7 +88,7 @@ def run_arma(logger, order=None):
         logger,
         ar_order=order[0],
         ma_order=order[1],
-        with_c=False,
+        with_c=True,
         initial_history_size=INITIAL_HISTORY_SIZE,
         number_of_predictions_ahead=NUMBER_OF_PREDICTIONS_AHEAD,
         lag_size=LAG_SIZE,
@@ -87,13 +98,14 @@ def run_arma(logger, order=None):
 
 
 def main(logger):
-    ar_metrics = run_ar(logger)
-    # ma_values = run_ma(logger)
+    # ar_metrics = run_ar(logger)
+    ma_values = run_ma(logger)
     # arma_values = run_arma(logger)
 
     # print values
     logger.log('-- avg. performance:')
-    utils.log_metrics_dict(logger, ar_metrics)
+    # utils.log_metrics_dict(logger, ar_metrics)
+    utils.log_metrics_dict(logger, ma_values)
 
     # logger.log('AR avg. performance: {ar_values}'.format(ar_values=ar_values))
     # logger.log('MA avg. performance: {ma_values}'.format(ma_values=ma_values))
@@ -224,7 +236,7 @@ def test_gradient_descent(logger):
 
 if __name__ == '__main__':
     main_logger = Logger()
-    # main(main_logger)
+    main(main_logger)
     # calc_rate(main_logger)
     # sigmoid_test(main_logger, is_online=IS_ONLINE, should_plot=SHOULD_PLOT, lag_size=LAG_SIZE)
-    test_gradient_descent(main_logger)
+    # test_gradient_descent(main_logger)

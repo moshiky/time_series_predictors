@@ -68,13 +68,13 @@ class GradientDescentFitter:
         gamma_0 = np.float64(gamma_0)
 
         # log initial params
-        self.__logger.log('initial params: w={w_vector}, gamma_0={gamma_0}'.format(w_vector=w_vector, gamma_0=gamma_0))
+        # self.__logger.log('initial params: w={w_vector}, gamma_0={gamma_0}'.format(w_vector=w_vector, gamma_0=gamma_0))
 
         # initiate progress logging
         evaluations = list()
         last_evaluation = self.__target_function(y_for_x, w_vector)
         evaluations.append(last_evaluation)
-        self.__logger.log('initial evaluation: {evaluation}'.format(evaluation=last_evaluation))
+        # self.__logger.log('initial evaluation: {evaluation}'.format(evaluation=last_evaluation))
 
         if plot_progress:
             eval_fig = pyplot.figure()
@@ -163,9 +163,9 @@ class GradientDescentFitter:
                 evaluations.append(last_evaluation)
 
         # log learn statistics
-        self.__logger.log('evaluation: {evaluation}'.format(evaluation=self.__target_function(y_for_x, w_vector)))
-        self.__logger.log('epochs: {epoch_id}'.format(epoch_id=epoch_id))
-        self.__logger.log('updates: {update_id}'.format(update_id=t_counter))
+        # self.__logger.log('evaluation: {evaluation}'.format(evaluation=self.__target_function(y_for_x, w_vector)))
+        # self.__logger.log('epochs: {epoch_id}'.format(epoch_id=epoch_id))
+        # self.__logger.log('updates: {update_id}'.format(update_id=t_counter))
 
         # end figure
         pyplot.close('all')

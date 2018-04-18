@@ -10,7 +10,7 @@ class OfflineAutoRegressionHandler:
         self.__window_size = window_size
         self.__params = None
 
-    def learn_model_params(self, train_set, should_print_params=True):
+    def learn_model_params(self, train_set, should_print_params=False):
         # build x list
         x_values = list()
         for row in train_set:
@@ -31,7 +31,7 @@ class OfflineAutoRegressionHandler:
 
     def predict_using_learned_params(self, initial_values, prediction_length):
         if len(initial_values) < self.__window_size:
-            raise Exception('must provide initial values as at least the size of the window size. '
+            raise Exception('must provide initial values at least as the size of the window size. '
                             'provided: {values_length} window size: {window_size}'.format(
                                 values_length=len(initial_values), window_size=self.__window_size))
 
@@ -43,7 +43,7 @@ class OfflineAutoRegressionHandler:
             next_value = \
                 sum(
                     [self.__params[j] * history[j-self.__window_size] for j in range(self.__window_size)],
-                    self.__params[-1]
+                    # self.__params[-1]
                 )
             history.append(next_value)
 

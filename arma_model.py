@@ -1,6 +1,7 @@
 
 
 from statsmodels.tsa.arima_model import ARMA
+import numpy as np
 from sklearn.metrics import mean_squared_error
 import utils
 
@@ -96,14 +97,7 @@ class ARMAModel:
 
         # check for multi-step direct forecast settings
         if not update_model and not use_sample_data:
-            # predictions = model_fit.forecast(steps=number_of_predictions_ahead)[0]
-            predictions = \
-                model_fit.predict(
-                    start=initial_history_size,
-                    end=initial_history_size + number_of_predictions_ahead - 1,
-                    exog=history,
-                    dynamic=False
-                )
+            predictions = model_fit.forecast(steps=number_of_predictions_ahead)[0]
 
         else:
             # predict values using fitted model one by one
@@ -143,4 +137,4 @@ class ARMAModel:
             )
 
         # calculate and return error metrics
-        return utils.get_all_metrics(test[:len(predictions)], predictions)
+        return test[:len(predictions)], predictions

@@ -9,19 +9,19 @@ def get_sigmoid_predictions_for_values(x_values, w_vector):
     # calculate values
     y_for_x = dict()
     for x_t in x_values:
-        y_for_x[x_t] = get_sigmoid_prediction(x_t, w_vector)
+        y_for_x[x_t] = get_sigmoid_prediction(x_t, w_vector, should_round=False)
     return y_for_x
 
 
-def get_sigmoid_prediction(x_value, w_vector):
+def get_sigmoid_prediction(x_value, w_vector, should_round=False):
     # extract params
     a_param, b_param, c_param, k_param, f_param = w_vector
 
     # return sigmoid value
-    return (
-        a_param +
-        b_param / (c_param + np.exp(k_param * x_value + f_param))
-    )
+    raw_value = a_param + b_param / (c_param + np.exp(k_param * x_value + f_param))
+
+    # return value
+    return round(raw_value) if should_round else raw_value
 
 
 def get_mean_error_rate(y_for_x, w_vector):

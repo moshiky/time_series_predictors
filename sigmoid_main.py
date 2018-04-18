@@ -7,7 +7,7 @@ from logger import Logger
 import utils
 from graph_manager import GraphManager
 from statistics_manager import StatisticsManager
-import sigmoid_fuctions_v2
+import sigmoid_functions_v2
 
 
 H_INDEX_CSV_FILE_PATH = r'datasets/author_h_index.csv'
@@ -19,7 +19,7 @@ ONLINE_EPOCHS = 5000
 IS_ONLINE = True
 MAX_PROCESSES = 2
 LAG_SIZE = 1
-DATASET_SIZE = 10
+DATASET_SIZE = 100
 
 lock = multiprocessing.Lock()
 graph_manager = GraphManager(GRAPH_OUTPUT_FOLDER_PATH)
@@ -129,7 +129,7 @@ def fit(fitter, y_for_x, initial_w_vector, epochs=None, gamma_change_mode=Gradie
         gamma_0=1e-6):
     fitted_w_vector = \
         fitter.fit_and_predict_gd_online(
-            y_for_x, len(initial_w_vector), is_stochastic=True, fit_limit_rank=5e-3, plot_progress=False,
+            y_for_x, len(initial_w_vector), is_stochastic=True, fit_limit_rank=1e-4, plot_progress=False,
             first_w=initial_w_vector, gamma_change_mode=gamma_change_mode, gamma_0=gamma_0,
             evaluation_plot_mode=GradientDescentFitter.PLOT_RECENT, max_epochs=epochs
         )
@@ -149,8 +149,8 @@ def fit_mean_h_index_graph():
     gd_fitter = \
         GradientDescentFitter(
             logger,
-            target_function=sigmoid_fuctions_v2.get_mean_error_rate,
-            gradient_function=sigmoid_fuctions_v2.get_gradient
+            target_function=sigmoid_functions_v2.get_mean_error_rate,
+            gradient_function=sigmoid_functions_v2.get_gradient
         )
 
     # fit sigmoid params using gradient descent
@@ -166,7 +166,7 @@ def fit_mean_h_index_graph():
     logger.log('# predict next values')
     # <offline>
     test_x_values = list(test.keys())
-    predictions = sigmoid_fuctions_v2.get_sigmoid_predictions_for_values(test_x_values, fitted_w_vector)
+    predictions = sigmoid_functions_v2.get_sigmoid_predictions_for_values(test_x_values, fitted_w_vector)
 
     # <online>
 
@@ -190,57 +190,110 @@ def fit_online_thread_func(sample_sets, record_index):
     gd_fitter = \
         GradientDescentFitter(
             logger,
-            target_function=sigmoid_fuctions_v2.get_mean_error_rate,
-            gradient_function=sigmoid_fuctions_v2.get_gradient
+            target_function=sigmoid_functions_v2.get_mean_error_rate,
+            gradient_function=sigmoid_functions_v2.get_gradient
         )
 
     # extract data sets
     train_set, test_set = sample_sets
+    combined = dict(train_set)
+    for key in test_set:
+        combined[key] = test_set[key]
 
     # log record index
     logger.log('record #{record_index}'.format(record_index=record_index))
     test_x_values = list(test_set.keys())
 
-    # fit first params
-    history = dict(train_set)
-    # last_fitted_w_vector = fit(gd_fitter, history, MEAN_H_INDEX_GRAPH_PARAMS)
+    # fit values
+    history = dict(combined)
+    predictions = dict()
+    last_fitted_w_vector = sigmoid_functions_v2.INITIAL_W_VECTOR
+    fitted_values_vector = None
     try:
-        last_fitted_w_vector = \
-            fit(gd_fitter, history, sigmoid_fuctions_v2.INITIAL_W_VECTOR, gamma_0=1e-3,
-                gamma_change_mode=GradientDescentFitter.GAMMA_DECREASING)
+        sorted_history_keys = list(sorted(history.keys()))
+
+        for i in range(2, len(sorted_history_keys)):
+
+            x_t = sorted_history_keys[i]
+
+            # predict
+            if i == len(train_set):
+                fitted_values_vector = np.array(last_fitted_w_vector)
+
+            if i >= len(train_set):
+                predictions[x_t] = \
+                    sigmoid_functions_v2.get_sigmoid_prediction(x_t, last_fitted_w_vector, should_round=False)
+
+            # build recent history
+            recent_history = dict(
+                [(x_t, history[x_t])] * 20
+                + [(sorted_history_keys[i-1], history[sorted_history_keys[i-1]])] * 2
+                + [(sorted_history_keys[i-2], history[sorted_history_keys[i-2]])] * 1
+            )
+
+            # fit
+            last_fitted_w_vector = \
+                fit(gd_fitter, recent_history, last_fitted_w_vector, gamma_0=1e-6,
+                    gamma_change_mode=GradientDescentFitter.GAMMA_INCREASING, epochs=ONLINE_EPOCHS)
+
     except Exception as ex:
         logger.log('ERROR: {ex}'.format(ex=ex))
         return None
 
     # calculate initial fitted values
     fitted_values = \
-        sigmoid_fuctions_v2.get_sigmoid_predictions_for_values(
-            list(range(1, min(test_x_values))), last_fitted_w_vector
+        sigmoid_functions_v2.get_sigmoid_predictions_for_values(
+            list(range(1, min(test_x_values))), fitted_values_vector
         )
 
-    # predict test values in online mode
-    predictions = dict()
-    for i in range(len(test_x_values)):
-        # predict next
-        x_t = test_x_values[i]
-        predictions[x_t] = sigmoid_fuctions_v2.get_sigmoid_prediction(x_t, last_fitted_w_vector)
-
-        # add observation to history
-        history[x_t] = test_set[x_t]
-
-        # remove oldest observations
-        while len(history) > LAG_SIZE:
-            oldest_xt = min(history.keys())
-            history.pop(oldest_xt)
-
-        # fit on history
-        try:
-            last_fitted_w_vector = fit(gd_fitter, history, last_fitted_w_vector, epochs=ONLINE_EPOCHS,
-                                       gamma_0=1e-5,
-                                       gamma_change_mode=GradientDescentFitter.GAMMA_DECREASING)
-        except Exception as ex:
-            logger.log('ERROR: {ex}'.format(ex=ex))
-            return None
+    # fit first params
+    # history = dict(train_set)
+    # last_fitted_w_vector = sigmoid_fuctions_v2.INITIAL_W_VECTOR
+    # try:
+    #     sorted_history_keys = list(sorted(history.keys()))
+    #     for i in range(2, len(sorted_history_keys)):
+    #         recent_history = dict(
+    #             [(sorted_history_keys[i], history[sorted_history_keys[i]])] * 9
+    #             + [(sorted_history_keys[i-1], history[sorted_history_keys[i-1]])] * 3
+    #             + [(sorted_history_keys[i-2], history[sorted_history_keys[i-2]])] * 1
+    #         )
+    #         last_fitted_w_vector = \
+    #             fit(gd_fitter, recent_history, last_fitted_w_vector, gamma_0=1e-4,
+    #                 gamma_change_mode=GradientDescentFitter.GAMMA_DECREASING, epochs=ONLINE_EPOCHS)
+    #
+    # except Exception as ex:
+    #     logger.log('ERROR: {ex}'.format(ex=ex))
+    #     return None
+    #
+    # # calculate initial fitted values
+    # fitted_values = \
+    #     sigmoid_fuctions_v2.get_sigmoid_predictions_for_values(
+    #         list(range(1, min(test_x_values))), last_fitted_w_vector
+    #     )
+    #
+    # # predict test values in online mode
+    # predictions = dict()
+    # for i in range(len(test_x_values)):
+    #     # predict next
+    #     x_t = test_x_values[i]
+    #     predictions[x_t] = sigmoid_functions_v2.get_sigmoid_prediction(x_t, last_fitted_w_vector)
+    #
+    #     # add observation to history
+    #     history[x_t] = test_set[x_t]
+    #
+    #     # remove oldest observations
+    #     while len(history) > LAG_SIZE:
+    #         oldest_xt = min(history.keys())
+    #         history.pop(oldest_xt)
+    #
+    #     # fit on history
+    #     try:
+    #         last_fitted_w_vector = fit(gd_fitter, history, last_fitted_w_vector, epochs=ONLINE_EPOCHS,
+    #                                    gamma_0=1e-4,
+    #                                    gamma_change_mode=GradientDescentFitter.GAMMA_DECREASING)
+    #     except Exception as ex:
+    #         logger.log('ERROR: {ex}'.format(ex=ex))
+    #         return None
 
     # calculate final rank (R^2, MSE, MAPE)
     metrics = utils.get_all_metrics(

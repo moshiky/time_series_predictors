@@ -90,17 +90,40 @@ def get_mape_value(series_a, series_b):
     # Mean Absolute Percentage Error (MAPE)
     errors = \
         [
-            float( abs(series_a[i]-series_b[i]) ) / max(series_a[i], 1)
-            for i in range(len(series_a))
+            abs(float(series_a[i]-series_b[i]) / series_a[i])
+            for i in range(len(series_a)) if series_a[i] != 0
         ]
     return float(sum(errors))/len(errors)
 
 
+def pop_bad_predictions(series_a, series_b):
+    series_a_filtered = list()
+    series_b_filtered = list()
+    series_a_bad = list()
+    series_b_bad = list()
+    for elem_id in range(min(len(series_a), len(series_b))):
+        relative_error = abs((series_a[elem_id]-series_b[elem_id])/series_a[elem_id])
+        if relative_error > Consts.BAD_PREDICTION_RATE:
+            series_a_bad.append(series_a[elem_id])
+            series_b_bad.append(series_b[elem_id])
+        else:
+            series_a_filtered.append(series_a[elem_id])
+            series_b_filtered.append(series_b[elem_id])
+
+    return series_a_filtered, series_b_filtered, series_a_bad, series_b_bad
+
+
 def get_all_metrics(series_a, series_b):
+    r2_value = get_r_squared_value(series_a, series_b)
+    mse_value = get_mse_value(series_a, series_b)
+    mape_value = get_mape_value(series_a, series_b)
+    if r2_value == 0 or mse_value > 1000 or mape_value > 100:
+        raise Exception('bad prediction')
+
     return {
-        'r2': get_r_squared_value(series_a, series_b),
-        'mse': get_mse_value(series_a, series_b),
-        'mape': get_mape_value(series_a, series_b)
+        'r2': r2_value,
+        'mse': mse_value,
+        'mape': mape_value
     }
 
 
@@ -126,7 +149,16 @@ def calc_mid_end_rate(data_records):
 
 def log_metrics_dict(logger, metrics):
     for metric_name in sorted(metrics.keys(), reverse=True):
-        logger.log('{key} : {metric_value}'.format(key=metric_name, metric_value=metrics[metric_name]))
+        if type(metrics[metric_name]) == list:
+            m_sum = sum(metrics[metric_name])
+            m_len = len(metrics[metric_name])
+            logger.log('{key} : {metric_value}'.format(key=metric_name, metric_value=m_sum/m_len))
+
+            pyplot.hist(metrics[metric_name])
+            pyplot.show()
+
+        else:
+            logger.log('{key} : {metric_value}'.format(key=metric_name, metric_value=metrics[metric_name]))
 
 
 def get_synthetic_sigmoid_ts(l_param, a_param, length, y_t0, add_noise=False, should_plot=False):
