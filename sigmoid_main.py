@@ -357,8 +357,10 @@ def calculate_dataset_mean_scores():
 
     # log hyper-parameters
     gamma_0 = 1e-4
+    batch_size = 20
     epochs = 50
-    logger.log('hyper parameters: lr={lr}, epochs={epochs}'.format(lr=gamma_0, epochs=epochs))
+    logger.log('hyper parameters: lr={lr}, epochs={epochs}, batch size={batch_size}'.format(
+        lr=gamma_0, epochs=epochs, batch_size=batch_size))
 
     # fit and predict
     metrics_storage = dict()
@@ -376,7 +378,7 @@ def calculate_dataset_mean_scores():
         gd_fitter = GradientDescentFitter(logger, sigmoid_functions_v3.SigmoidV3)
 
         # fit on train
-        gd_fitter.fit(train_set, gamma_0=gamma_0, should_shuffle=True, epochs=epochs)
+        gd_fitter.fit(train_set, gamma_0=gamma_0, should_shuffle=True, epochs=epochs, batch_size=batch_size)
 
         # get test predictions
         predictions = list()
