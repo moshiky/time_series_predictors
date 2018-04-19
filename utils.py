@@ -117,7 +117,7 @@ def get_all_metrics(series_a, series_b):
     r2_value = get_r_squared_value(series_a, series_b)
     mse_value = get_mse_value(series_a, series_b)
     mape_value = get_mape_value(series_a, series_b)
-    if r2_value == 0 or mse_value > 1000 or mape_value > 100:
+    if r2_value < 0.1 or mse_value > 1000 or mape_value > 100:
         raise Exception('bad prediction')
 
     return {

@@ -21,10 +21,12 @@ class GradientDescentFitter:
     RECENT_AMOUNT = 10
     STOP_LEARNING_INTERVAL = 1e-4
 
-    def __init__(self, logger, target_function, gradient_function):
+    def __init__(self, logger, model_class):
         self.__logger = logger
-        self.__target_function = target_function
-        self.__gradient_function = gradient_function
+        self.__target_function = model_class.get_mean_error_rate
+        self.__gradient_function = model_class.get_gradient
+        self.__prediction_function = model_class.get_prediction
+        self.__w_vector = model_class.get_initial_w()
 
     @staticmethod
     def __is_learning_stopped(evaluations):
@@ -34,6 +36,44 @@ class GradientDescentFitter:
         values_to_consider = evaluations[-GradientDescentFitter.RECENT_AMOUNT:]
         recent_avg = sum(values_to_consider) / len(values_to_consider)
         return abs(recent_avg - evaluations[-1]) < GradientDescentFitter.STOP_LEARNING_INTERVAL
+
+    def fit(self, train_set, gamma_0, should_shuffle, epochs):
+        # log initial results
+        # last_evaluation = self.__target_function(train_set, self.__w_vector)
+        # self.__logger.log('initial evaluation: {score}'.format(score=last_evaluation))
+
+        # extract x values
+        x_values = list(train_set.keys())
+
+        # apply gradient improvements
+        for i in range(epochs):
+            # self.__logger.log('epoch #{i}'.format(i=i))
+
+            if should_shuffle:
+                # shuffle samples
+                random.shuffle(x_values)
+
+            # run for series values
+            for x_t in x_values:
+                # todo: add batch support
+                # get y_t
+                y_t = train_set[x_t]
+
+                # calculate gradient
+                gradient_values = self.__gradient_function(x_t, y_t, self.__w_vector)
+
+                # apply gradient change
+                self.__w_vector -= gamma_0 * gradient_values
+
+            # log initial results
+            # last_evaluation = self.__target_function(train_set, self.__w_vector)
+            # self.__logger.log('current evaluation: {score}'.format(score=last_evaluation))
+
+    def predict(self, x_t):
+        predicted_value = self.__prediction_function(x_t, self.__w_vector)
+        if np.isnan(predicted_value):
+            raise Exception('nan prediction')
+        return predicted_value
 
     def fit_and_predict_gd_online(self, y_for_x, w_size, is_stochastic=False, max_epochs=None, fit_limit_rank=None,
                                   first_w=None, gamma_0=0.0001, plot_progress=True, gamma_change_mode=GAMMA_STATIC,
