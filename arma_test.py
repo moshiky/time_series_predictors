@@ -7,7 +7,7 @@ import time
 
 
 DATASET_FILE_PATH = r'datasets/author_h_index.csv'
-LAG_SIZE = 0
+LAG_SIZE = 13
 INITIAL_HISTORY_SIZE = 15
 NUMBER_OF_PREDICTIONS_AHEAD = 10
 LOGGING_INTERVAL = 100
@@ -20,12 +20,12 @@ def predict_using_online_mode(
         lag_size=0, update_model=True, use_sample_data=True):
     # read series data
     # read input file - returns list of lists
-    data_records = utils.parse_csv(DATASET_FILE_PATH, smoothing_level=1, should_shuffle=False)
+    data_records = utils.parse_csv(DATASET_FILE_PATH, smoothing_level=1, should_shuffle=False)[:500]
     logger.log('records loaded: {num_records}'.format(num_records=len(data_records)))
 
     # define min error storage
     model_error_metrics = dict()
-    valids_counter = 0
+    valid_samples_counter = 0
 
     # make predictions for each record
     logger.log('** ARMA settings: p={p}, q={q}'.format(p=ar_order, q=ma_order))
@@ -57,17 +57,17 @@ def predict_using_online_mode(
         except Exception as ex:
             if 'Not enough info' not in str(ex):
                 logger.log(ex)
-                logger.log('series: {ser}'.format(ser=current_sample))
-                logger.log('predictions: {preds}'.format(preds=predictions))
+                # logger.log('series: {ser}'.format(ser=current_sample))
+                # logger.log('predictions: {preds}'.format(preds=predictions))
             continue
 
         for metric_name in error_metrics.keys():
             if metric_name not in model_error_metrics.keys():
                 model_error_metrics[metric_name] = list()
             model_error_metrics[metric_name].append(error_metrics[metric_name])
-        valids_counter += 1
+        valid_samples_counter += 1
 
-    logger.log('total valid predictions: {valid_predictions}'.format(valid_predictions=valids_counter))
+    logger.log('total valid predictions: {valid_predictions}'.format(valid_predictions=valid_samples_counter))
     logger.log('total time: {total_secs} secs'.format(total_secs=time.time()-start_time))
     return model_error_metrics
 
@@ -98,14 +98,14 @@ def run_arma(logger, order=None):
 
 
 def main(logger):
-    # ar_metrics = run_ar(logger)
-    ma_values = run_ma(logger)
+    ar_metrics = run_ar(logger)
+    # ma_values = run_ma(logger)
     # arma_values = run_arma(logger)
 
     # print values
     logger.log('-- avg. performance:')
-    # utils.log_metrics_dict(logger, ar_metrics)
-    utils.log_metrics_dict(logger, ma_values)
+    utils.log_metrics_dict(logger, ar_metrics)
+    # utils.log_metrics_dict(logger, ma_values)
 
     # logger.log('AR avg. performance: {ar_values}'.format(ar_values=ar_values))
     # logger.log('MA avg. performance: {ma_values}'.format(ma_values=ma_values))

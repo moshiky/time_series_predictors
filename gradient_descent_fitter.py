@@ -37,28 +37,23 @@ class GradientDescentFitter:
         recent_avg = sum(values_to_consider) / len(values_to_consider)
         return abs(recent_avg - evaluations[-1]) < GradientDescentFitter.STOP_LEARNING_INTERVAL
 
-    def fit(self, train_set, gamma_0, should_shuffle, epochs, batch_size):
-        # log initial results
-        # last_evaluation = self.__target_function(train_set, self.__w_vector)
-        # self.__logger.log('initial evaluation: {score}'.format(score=last_evaluation))
-
+    def fit(self, train_set, gamma_0, should_shuffle, epochs, batch_size, lag):
         # extract x values
         x_values = list(train_set.keys())
+        x_values = sorted(x_values)[-lag:]
 
         # apply gradient improvements
         gradient_total = np.zeros(self.__w_vector.shape)
         in_batch_index = 0
 
         for i in range(epochs):
-            # self.__logger.log('epoch #{i}'.format(i=i))
-
+            # shuffle records
             if should_shuffle:
                 # shuffle samples
                 random.shuffle(x_values)
 
             # run for series values
             for x_t in x_values:
-                # todo: add batch support
                 # get y_t
                 y_t = train_set[x_t]
 

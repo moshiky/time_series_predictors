@@ -10,16 +10,16 @@ class OfflineAutoRegressionHandler:
         self.__window_size = window_size
         self.__params = None
 
-    def learn_model_params(self, train_set, should_print_params=False):
+    def learn_model_params(self, train_set, should_print_params=False, lag=2):
         # build x list
         x_values = list()
-        for row in train_set:
+        for row in train_set[-lag:]:
             # x_values += [row[i:i+self.__window_size] + [1.0] for i in range(len(row[:-self.__window_size]))]
             x_values += [row[i:i + self.__window_size] for i in range(len(row[:-self.__window_size]))]
 
         # build y list
         y_values = list()
-        for row in train_set:
+        for row in train_set[-lag:]:
             y_values += row[self.__window_size:]
 
         # find params

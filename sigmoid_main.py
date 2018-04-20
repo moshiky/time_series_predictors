@@ -21,11 +21,86 @@ ONLINE_EPOCHS = 5000
 IS_ONLINE = False
 MAX_PROCESSES = 2
 LAG_SIZE = 1
-DATASET_SIZE = 500
+DATASET_SIZE = None
 
 lock = multiprocessing.Lock()
 graph_manager = GraphManager(GRAPH_OUTPUT_FOLDER_PATH)
 statistics_manager = StatisticsManager()
+
+
+def calculate_dataset_mean_scores():
+    # create logger
+    logger = Logger()
+
+    # load series
+    logger.log('# load dataset..')
+    dataset = utils.load_dataset_for_gd_fitting(H_INDEX_CSV_FILE_PATH, SERIES_LENGTH, TEST_SIZE)
+    if DATASET_SIZE is not None:
+        dataset = dataset[:DATASET_SIZE]
+
+    logger.log('loaded dataset size: {num_records}'.format(num_records=len(dataset)))
+
+    # log hyper-parameters
+    train_set_size = SERIES_LENGTH - TEST_SIZE
+    gamma_0 = 1e-4
+    batch_size = 20
+    lag = 1
+    epochs = 50 * round(train_set_size / lag)
+    logger.log('hyper parameters: lr={lr}, epochs={epochs}, batch size={batch_size}, lag={lag}'.format(
+        lr=gamma_0, epochs=epochs, batch_size=batch_size, lag=lag))
+
+    # fit and predict
+    metrics_storage = dict()
+    start_time = time.time()
+    record_id = 0
+    for record in dataset:
+        if (record_id % 100) == 0:
+            logger.log('record #{i}'.format(i=record_id))
+        record_id += 1
+
+        # split to train and test sets
+        train_set, test_set = record
+
+        # build fitter
+        gd_fitter = GradientDescentFitter(logger, sigmoid_functions_v3.SigmoidV3)
+
+        # fit on train
+        gd_fitter.fit(train_set, gamma_0=gamma_0, should_shuffle=True, epochs=epochs, batch_size=batch_size, lag=lag)
+
+        # get test predictions
+        predictions = list()
+        test_values = list()
+        try:
+            for x_t in test_set.keys():
+                predictions.append(gd_fitter.predict(x_t))
+                test_values.append(test_set[x_t])
+        except Exception as ex:
+            if 'nan prediction' in str(ex):
+                continue
+            else:
+                raise ex
+
+        # calculate error
+        try:
+            error_metrics = utils.get_all_metrics(test_values, predictions)
+        except Exception as ex:
+            if 'bad prediction' in str(ex):
+                continue
+            else:
+                raise ex
+
+        # add to metric counters
+        for metric_name in error_metrics.keys():
+            if metric_name not in metrics_storage.keys():
+                metrics_storage[metric_name] = list()
+            metrics_storage[metric_name].append(error_metrics[metric_name])
+
+    # log statistics
+    logger.log('total time: {total_time} secs'.format(total_time=time.time()-start_time))
+    logger.log('valid samples: {valid}'.format(valid=len(metrics_storage[list(metrics_storage.keys())[0]])))
+
+    # log average error
+    utils.log_metrics_dict(logger, metrics_storage)
 
 
 def get_mean_h_index_graph():
@@ -341,137 +416,6 @@ def fit_online(dataset):
     logger.log('## average overall ranks:')
     # utils.log_metrics_dict(logger, statistics_manager.get_average_metrics())
     utils.log_metrics_dict(logger, statistics_manager.get_avg_from_csv())
-
-
-def calculate_dataset_mean_scores():
-    # create logger
-    logger = Logger()
-
-    # load series
-    logger.log('# load dataset..')
-    dataset = utils.load_dataset_for_gd_fitting(H_INDEX_CSV_FILE_PATH, SERIES_LENGTH, TEST_SIZE)
-    if DATASET_SIZE is not None:
-        dataset = dataset[:DATASET_SIZE]
-
-    logger.log('loaded dataset size: {num_records}'.format(num_records=len(dataset)))
-
-    # log hyper-parameters
-    gamma_0 = 1e-4
-    batch_size = 20
-    epochs = 50
-    logger.log('hyper parameters: lr={lr}, epochs={epochs}, batch size={batch_size}'.format(
-        lr=gamma_0, epochs=epochs, batch_size=batch_size))
-
-    # fit and predict
-    metrics_storage = dict()
-    start_time = time.time()
-    record_id = 0
-    for record in dataset:
-        if (record_id % 100) == 0:
-            logger.log('record #{i}'.format(i=record_id))
-        record_id += 1
-
-        # split to train and test sets
-        train_set, test_set = record
-
-        # build fitter
-        gd_fitter = GradientDescentFitter(logger, sigmoid_functions_v3.SigmoidV3)
-
-        # fit on train
-        gd_fitter.fit(train_set, gamma_0=gamma_0, should_shuffle=True, epochs=epochs, batch_size=batch_size)
-
-        # get test predictions
-        predictions = list()
-        test_values = list()
-        try:
-            for x_t in test_set.keys():
-                predictions.append(gd_fitter.predict(x_t))
-                test_values.append(test_set[x_t])
-        except Exception as ex:
-            if 'nan prediction' in str(ex):
-                continue
-            else:
-                raise ex
-
-        # calculate error
-        try:
-            error_metrics = utils.get_all_metrics(test_values, predictions)
-        except Exception as ex:
-            if 'bad prediction' in str(ex):
-                continue
-            else:
-                raise ex
-
-        # add to metric counters
-        for metric_name in error_metrics.keys():
-            if metric_name not in metrics_storage.keys():
-                metrics_storage[metric_name] = list()
-            metrics_storage[metric_name].append(error_metrics[metric_name])
-
-    # log statistics
-    logger.log('total time: {total_time} secs'.format(total_time=time.time()-start_time))
-    logger.log('valid samples: {valid}'.format(valid=len(metrics_storage[list(metrics_storage.keys())[0]])))
-
-    # log average error
-    utils.log_metrics_dict(logger, metrics_storage)
-
-    # if IS_ONLINE:
-    #     fit_online(dataset)
-    #
-    # else:
-    #     # create fitter
-    #     gd_fitter = GradientDescentFitter(logger, target_function=get_mean_error_rate, gradient_function=get_gradient)
-    #
-    #     # fit sigmoid params using gradient descent
-    #     logger.log('# fit all series..')
-    #     figure_index = 0
-    #     metric_counters = dict()
-    #     for train_set, test_set in dataset:
-    #         logger.log('## record #{figure_index}'.format(figure_index=figure_index))
-    #         test_x_values = list(test_set.keys())
-    #
-    #         # # plot full graph
-    #         full_series_values = list(train_set.values()) + list(test_set.values())
-    #
-    #         # ## <offline>
-    #         # fit w vector
-    #         fitted_w_vector = fit(gd_fitter, train_set, MEAN_H_INDEX_GRAPH_PARAMS)
-    #         logger.log('fitted w vector: {fitted_vector}'.format(fitted_vector=fitted_w_vector))
-    #
-    #         # predict next values
-    #         logger.log('predict next values')
-    #         fitted_values = get_sigmoid_predictions_for_values(list(range(1, min(test_x_values))), fitted_w_vector)
-    #         predictions = get_sigmoid_predictions_for_values(test_x_values, fitted_w_vector)
-    #
-    #         # calculate final rank (R^2, MSE, MAPE)
-    #         logger.log('final ranks:')
-    #         metrics = utils.get_all_metrics(
-    #                 series_a=[x[1] for x in sorted(test_set.items())],
-    #                 series_b=[x[1] for x in sorted(predictions.items())]
-    #             )
-    #         utils.log_metrics_dict(logger, metrics)
-    #
-    #         # plot graph
-    #         GraphManager(GRAPH_OUTPUT_FOLDER_PATH).plot_graph_and_prediction(
-    #             original_series=full_series_values,
-    #             fitted_values=list(fitted_values.values()),
-    #             predictions=list(predictions.values()),
-    #             prediction_start_index=len(train_set)+1,
-    #             file_name='sigmoid_{id}.png'.format(id=figure_index),
-    #             store=True,
-    #             show=False
-    #         )
-    #         figure_index += 1
-    #
-    #         # add to metric counters
-    #         for metric_name in metrics.keys():
-    #             if metric_name not in metric_counters.keys():
-    #                 metric_counters[metric_name] = list()
-    #             metric_counters[metric_name].append(metrics[metric_name])
-    #
-    #     # log average metrics
-    #     logger.log('## average overall ranks:')
-    #     utils.log_metrics_dict(logger, metric_counters)
 
 
 if __name__ == '__main__':

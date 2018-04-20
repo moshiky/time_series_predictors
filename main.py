@@ -309,7 +309,7 @@ def main(file_path, logger_p):
             logger_p,
             data_records,
             [
-                (OfflineAutoRegressionHandler, 2),
+                (OfflineAutoRegressionHandler, 1),
                 # (MovingAverageHandler, 1),
             ]
         )
