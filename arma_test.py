@@ -10,17 +10,16 @@ DATASET_FILE_PATH = r'datasets/author_h_index.csv'
 LAG_SIZE = 13
 INITIAL_HISTORY_SIZE = 15
 NUMBER_OF_PREDICTIONS_AHEAD = 10
-LOGGING_INTERVAL = 100
+LOGGING_INTERVAL = 10
 SHOULD_PLOT = False
-IS_ONLINE = False
+IS_ONLINE = True
 
 
 def predict_using_online_mode(
-        logger, ar_order, ma_order, with_c=True, initial_history_size=5, number_of_predictions_ahead=10,
-        lag_size=0, update_model=True, use_sample_data=True):
+        logger, ar_order, ma_order, with_c=True, initial_history_size=5, number_of_predictions_ahead=10, lag_size=0):
     # read series data
     # read input file - returns list of lists
-    data_records = utils.parse_csv(DATASET_FILE_PATH, smoothing_level=1, should_shuffle=False)[:500]
+    data_records = utils.parse_csv(DATASET_FILE_PATH, smoothing_level=1, should_shuffle=False)[:100]
     logger.log('records loaded: {num_records}'.format(num_records=len(data_records)))
 
     # define min error storage
@@ -34,25 +33,39 @@ def predict_using_online_mode(
         if (record_index % LOGGING_INTERVAL) == 0:
             logger.log('-- record #{record_index}'.format(record_index=record_index))
 
+        # test sample size and split to train and test sets
         current_sample = data_records[record_index]
+        if len(current_sample) < initial_history_size + number_of_predictions_ahead:
+            # logger.log('Not enough info in record. record size={record_size}'.format(record_size=len(current_sample)))
+            continue
+
+        train_set, test_set = \
+            current_sample[:initial_history_size], \
+            current_sample[initial_history_size:initial_history_size+number_of_predictions_ahead]
 
         # run ARMA model
-        arma_model = ARMAModel(logger, p=ar_order, q=ma_order, lag_size=lag_size)
+        arma_model = ARMAModel(logger, p=ar_order, q=ma_order, with_c=with_c, lag_size=lag_size)
 
         predictions = '<not initialized>'
         try:
-            test, predictions = \
-                arma_model.predict(
-                    current_sample,
-                    initial_history_size,
-                    number_of_predictions_ahead,
-                    with_c,
-                    update_model=update_model,
-                    use_sample_data=use_sample_data,
-                    should_plot=SHOULD_PLOT,
-                    record_id=record_index
-                )
-            error_metrics = utils.get_all_metrics(test, predictions)
+            arma_model.learn_model_params(train_set)
+
+            if not IS_ONLINE:
+                predictions = arma_model.predict_using_learned_params(train_set, number_of_predictions_ahead)
+
+            else:
+                predictions = list()
+                for i in range(number_of_predictions_ahead):
+                    # predict next value
+                    predicted_value = arma_model.predict_using_learned_params(train_set, 1)
+
+                    # store prediction
+                    predictions.append(predicted_value[0])
+
+                    # update model with test value
+                    arma_model.update_model([test_set[i]])
+
+            error_metrics = utils.get_all_metrics(test_set, predictions)
 
         except Exception as ex:
             if 'Not enough info' not in str(ex):
@@ -91,9 +104,7 @@ def run_arma(logger, order=None):
         with_c=True,
         initial_history_size=INITIAL_HISTORY_SIZE,
         number_of_predictions_ahead=NUMBER_OF_PREDICTIONS_AHEAD,
-        lag_size=LAG_SIZE,
-        update_model=IS_ONLINE,
-        use_sample_data=IS_ONLINE
+        lag_size=LAG_SIZE
     )
 
 

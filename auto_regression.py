@@ -77,7 +77,7 @@ def main(csv_file_path):
         model_fit = model.fit()
 
         # predict next value and concatenate to prediction list
-        predictions = model_fit.predict(start=len(history), end=len(history), dynamic=False)
+        predictions = model_fit.predict_using_learned_params(start=len(history), end=len(history), dynamic=False)
         prediction_list.append(predictions[0])
 
         # concatenate test[i] to history

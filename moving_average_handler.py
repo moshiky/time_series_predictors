@@ -29,7 +29,7 @@ class MovingAverageHandler:
                             'provided: {values_length} window size: {window_size}'.format(
                                 values_length=len(initial_values), window_size=self.__window_size))
 
-        return self.__model_fit.predict(0, prediction_length-1, initial_values)
+        return self.__model_fit.predict_using_learned_params(0, prediction_length - 1, initial_values)
 
     @staticmethod
     def test_gd(train_set, model_order):
