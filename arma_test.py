@@ -55,7 +55,6 @@ def predict_using_online_mode(
 
             if not IS_ONLINE:
                 predictions = arma_model.predict_using_learned_params(train_set, number_of_predictions_ahead)
-                params.append(arma_model.get_params())
 
             else:
                 predictions = list()
@@ -87,10 +86,6 @@ def predict_using_online_mode(
     logger.log('total valid predictions: {valid_predictions}'.format(valid_predictions=valid_samples_counter))
     logger.log('total time: {total_secs} secs'.format(total_secs=time.time()-start_time))
 
-    params_avg = np.array(params[0])
-    for i in range(1, len(params)):
-        params_avg += np.array(params[i])
-    logger.log('average params: {params}'.format(params=params_avg/len(params)))
     return model_error_metrics
 
 
