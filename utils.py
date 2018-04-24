@@ -69,6 +69,7 @@ def get_r_squared_value(series_a, series_b):
     0 <= value <= 1
     higher is better
     """
+    # todo: filter all values the same cases
     slope, intercept, r_value, p_value, std_err = stats.linregress(series_a, series_b)
     return r_value ** 2
 
