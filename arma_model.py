@@ -27,7 +27,7 @@ class ARMAModel:
         self.__train_set = None
         self.__model = None
 
-    def learn_model_params(self, train_set=None, print_settings=False):
+    def learn_model_params(self, train_set=None, print_settings=False, start_params=None):
         # store train set
         if train_set is not None:
             self.__train_set = train_set
@@ -49,7 +49,6 @@ class ARMAModel:
             'css-mle', 'mle', 'css'
         ]
         model_fit = None
-        start_params = None if self.__model is None else self.__model.params
         for trans_params_mode in [True, False]:
             for solver in solvers:
                 for method in methods:
@@ -91,4 +90,7 @@ class ARMAModel:
 
     def update_model(self, new_observations):
         self.__train_set += new_observations
-        self.learn_model_params()
+        self.learn_model_params(start_params=self.__model.params)
+
+    def get_params(self):
+        return self.__model.params

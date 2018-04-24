@@ -1,4 +1,5 @@
 
+import numpy as np
 import utils
 from arma_model import ARMAModel
 from sigmoid_curve import SigmoidCurve
@@ -10,16 +11,17 @@ DATASET_FILE_PATH = r'datasets/author_h_index.csv'
 LAG_SIZE = 13
 INITIAL_HISTORY_SIZE = 15
 NUMBER_OF_PREDICTIONS_AHEAD = 10
-LOGGING_INTERVAL = 10
+LOGGING_INTERVAL = 1000
 SHOULD_PLOT = False
-IS_ONLINE = True
+IS_ONLINE = False
+START_PARAMS = np.array([3.81666014, 0.9825708])
 
 
 def predict_using_online_mode(
         logger, ar_order, ma_order, with_c=True, initial_history_size=5, number_of_predictions_ahead=10, lag_size=0):
     # read series data
     # read input file - returns list of lists
-    data_records = utils.parse_csv(DATASET_FILE_PATH, smoothing_level=1, should_shuffle=False)[:100]
+    data_records = utils.parse_csv(DATASET_FILE_PATH, smoothing_level=1, should_shuffle=False)
     logger.log('records loaded: {num_records}'.format(num_records=len(data_records)))
 
     # define min error storage
@@ -29,6 +31,7 @@ def predict_using_online_mode(
     # make predictions for each record
     logger.log('** ARMA settings: p={p}, q={q}'.format(p=ar_order, q=ma_order))
     start_time = time.time()
+    params = list()
     for record_index in range(len(data_records)):
         if (record_index % LOGGING_INTERVAL) == 0:
             logger.log('-- record #{record_index}'.format(record_index=record_index))
@@ -48,10 +51,11 @@ def predict_using_online_mode(
 
         predictions = '<not initialized>'
         try:
-            arma_model.learn_model_params(train_set)
+            arma_model.learn_model_params(train_set, start_params=START_PARAMS)
 
             if not IS_ONLINE:
                 predictions = arma_model.predict_using_learned_params(train_set, number_of_predictions_ahead)
+                params.append(arma_model.get_params())
 
             else:
                 predictions = list()
@@ -82,6 +86,11 @@ def predict_using_online_mode(
 
     logger.log('total valid predictions: {valid_predictions}'.format(valid_predictions=valid_samples_counter))
     logger.log('total time: {total_secs} secs'.format(total_secs=time.time()-start_time))
+
+    params_avg = np.array(params[0])
+    for i in range(1, len(params)):
+        params_avg += np.array(params[i])
+    logger.log('average params: {params}'.format(params=params_avg/len(params)))
     return model_error_metrics
 
 
