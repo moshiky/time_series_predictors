@@ -13,12 +13,13 @@ INITIAL_HISTORY_SIZE = 15
 NUMBER_OF_PREDICTIONS_AHEAD = 10
 LOGGING_INTERVAL = 100
 SHOULD_PLOT = False
-IS_ONLINE = True
-START_PARAMS = np.array([3.81666014, 0.9825708])
+IS_ONLINE = False
+AR_START_PARAMS = np.array([3.81666014, 0.9825708])
 
 
 def predict_using_online_mode(
-        logger, ar_order, ma_order, with_c=True, initial_history_size=5, number_of_predictions_ahead=10, lag_size=0):
+        logger, ar_order, ma_order, with_c=True, initial_history_size=5,
+        number_of_predictions_ahead=10, lag_size=0, start_params=None):
     # read series data
     # read input file - returns list of lists
     data_records = utils.parse_csv(DATASET_FILE_PATH, smoothing_level=1, should_shuffle=False)
@@ -51,7 +52,7 @@ def predict_using_online_mode(
 
         predictions = '<not initialized>'
         try:
-            arma_model.learn_model_params(train_set, start_params=START_PARAMS)
+            arma_model.learn_model_params(train_set, start_params=start_params)
 
             if not IS_ONLINE:
                 predictions = arma_model.predict_using_learned_params(train_set, number_of_predictions_ahead)
@@ -90,14 +91,14 @@ def predict_using_online_mode(
 
 
 def run_ar(logger):
-    return run_arma(logger, (1, 0))
+    return run_arma(logger, (1, 0), AR_START_PARAMS)
 
 
 def run_ma(logger):
     return run_arma(logger, (0, 1))
 
 
-def run_arma(logger, order=None):
+def run_arma(logger, order=None, start_params=None):
     if order is None:
         order = (1, 1)
 
@@ -108,7 +109,8 @@ def run_arma(logger, order=None):
         with_c=True,
         initial_history_size=INITIAL_HISTORY_SIZE,
         number_of_predictions_ahead=NUMBER_OF_PREDICTIONS_AHEAD,
-        lag_size=LAG_SIZE
+        lag_size=LAG_SIZE,
+        start_params=start_params
     )
 
 
