@@ -21,12 +21,22 @@ class GradientDescentFitter:
     RECENT_AMOUNT = 10
     STOP_LEARNING_INTERVAL = 1e-4
 
-    def __init__(self, logger, model_class):
+    def __init__(self, logger, model_class, gamma_0, should_shuffle, initial_updates, batch_size, lag, gradient_size_target):
         self.__logger = logger
         self.__target_function = model_class.get_mean_error_rate
         self.__gradient_function = model_class.get_gradient
         self.__prediction_function = model_class.get_prediction
         self.__w_vector = model_class.get_initial_w()
+
+        self.__gamma_0 = gamma_0
+        self.__should_shuffle = should_shuffle
+        self.__updates = initial_updates
+        self.__batch_size = batch_size
+        self.__lag = lag
+        self.__gradient_size_target = gradient_size_target
+
+        # init empty members
+        self.__train_set = None
 
     @staticmethod
     def __is_learning_stopped(evaluations):
@@ -37,51 +47,73 @@ class GradientDescentFitter:
         recent_avg = sum(values_to_consider) / len(values_to_consider)
         return abs(recent_avg - evaluations[-1]) < GradientDescentFitter.STOP_LEARNING_INTERVAL
 
-    def fit(self, train_set, gamma_0, should_shuffle, epochs, batch_size, lag):
+    def fit(self, train_set=None, updates=None):
+        if train_set is not None:
+            self.__train_set = dict(train_set)
+
         # extract x values
-        x_values = list(train_set.keys())
-        x_values = sorted(x_values)[-lag:]
+        x_values = list(self.__train_set.keys())
+        x_values = sorted(x_values)[-self.__lag:]
 
         # apply gradient improvements
-        gradient_total = np.zeros(self.__w_vector.shape)
+        gradient_sum = np.zeros(self.__w_vector.shape)
+        last_gradient_avg_sum_size = 999.0
         in_batch_index = 0
+        updates_so_far = 0
+        max_updates = self.__updates if updates is None else updates
+        sample_index = -1
+        gamma_0 = self.__gamma_0
+        i = 0
 
-        for i in range(epochs):
-            # shuffle records
-            if should_shuffle:
-                # shuffle samples
-                random.shuffle(x_values)
+        while updates_so_far < max_updates and last_gradient_avg_sum_size > self.__gradient_size_target:
 
-            # run for series values
-            for x_t in x_values:
-                # get y_t
-                y_t = train_set[x_t]
+            # select x_t
+            if self.__should_shuffle:
+                sample_index = np.random.randint(low=0, high=len(x_values))
+            else:
+                sample_index = (sample_index+1) % len(x_values)
+            x_t = x_values[sample_index]
 
-                # calculate gradient
-                gradient_values = self.__gradient_function(x_t, y_t, self.__w_vector)
+            # get y_t
+            y_t = self.__train_set[x_t]
 
-                # store gradient
-                gradient_total += gradient_values
-                in_batch_index += 1
-                if in_batch_index == batch_size:
-                    # apply average gradient change
-                    self.__w_vector -= gamma_0 * gradient_total
-                    # init batch process
-                    gradient_total = np.zeros(self.__w_vector.shape)
-                    in_batch_index = 0
+            # calculate gradient
+            gradient = self.__gradient_function(x_t, y_t, self.__w_vector)
 
-        if in_batch_index > 0:
-            self.__w_vector -= gamma_0 * gradient_total
+            # store gradient
+            gradient_sum += gradient
+            in_batch_index += 1
 
-            # log initial results
-            # last_evaluation = self.__target_function(train_set, self.__w_vector)
-            # self.__logger.log('current evaluation: {score}'.format(score=last_evaluation))
+            # cut gamma
+            if ((updates_so_far + 1) % 200) == 0:
+                gamma_0 /= 5
+
+            # apply update at batch end
+            if in_batch_index == self.__batch_size:
+
+                # apply average gradient change
+                self.__w_vector -= gamma_0 * (gradient_sum / self.__batch_size)
+
+                # store gradient sum size
+                last_gradient_avg_sum_size = np.sqrt(np.sum(np.square(gradient_sum / self.__batch_size)))
+
+                # init batch process
+                gradient_sum = np.zeros(self.__w_vector.shape)
+                in_batch_index = 0
+                updates_so_far += 1
+
+        # self.__logger.log('stopped at update: {updates}'.format(updates=updates_so_far))
+        return updates_so_far
 
     def predict(self, x_t):
         predicted_value = self.__prediction_function(x_t, self.__w_vector)
         if np.isnan(predicted_value):
             raise Exception('nan prediction')
         return predicted_value
+
+    def update(self, new_x, new_y, online_updates):
+        self.__train_set[new_x] = new_y
+        return self.fit(updates=online_updates)
 
     def fit_and_predict_gd_online(self, y_for_x, w_size, is_stochastic=False, max_epochs=None, fit_limit_rank=None,
                                   first_w=None, gamma_0=0.0001, plot_progress=True, gamma_change_mode=GAMMA_STATIC,

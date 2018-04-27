@@ -155,7 +155,7 @@ def log_metrics_dict(logger, metrics):
             m_len = len(metrics[metric_name])
             logger.log('{key} : {metric_value}'.format(key=metric_name, metric_value=m_sum/m_len))
 
-            pyplot.hist(metrics[metric_name])
+            pyplot.hist(metrics[metric_name], bins=100, log=True)
             pyplot.show()
 
         else:
@@ -286,7 +286,7 @@ def get_inflection_point_of_sigmoid(series):
 
 def load_dataset_for_gd_fitting(file_path, series_length, test_size):
     # load csv
-    dataset_records = parse_csv(file_path, should_shuffle=False, smoothing_level=1)
+    dataset_records = parse_csv(file_path, should_shuffle=True, smoothing_level=1)
 
     # split to train and test groups - each is list of y_for_x dicts
     dataset_splitted = list()

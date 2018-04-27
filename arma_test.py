@@ -13,8 +13,9 @@ INITIAL_HISTORY_SIZE = 15
 NUMBER_OF_PREDICTIONS_AHEAD = 10
 LOGGING_INTERVAL = 100
 SHOULD_PLOT = False
-IS_ONLINE = False
+IS_ONLINE = True
 AR_START_PARAMS = np.array([3.81666014, 0.9825708])
+MA_START_PARAMS = np.array([3.71332862, 0.99670942])
 
 
 def predict_using_online_mode(
@@ -32,7 +33,6 @@ def predict_using_online_mode(
     # make predictions for each record
     logger.log('** ARMA settings: p={p}, q={q}'.format(p=ar_order, q=ma_order))
     start_time = time.time()
-    params = list()
     for record_index in range(len(data_records)):
         if (record_index % LOGGING_INTERVAL) == 0:
             logger.log('-- record #{record_index}'.format(record_index=record_index))
@@ -52,7 +52,7 @@ def predict_using_online_mode(
 
         predictions = '<not initialized>'
         try:
-            arma_model.learn_model_params(train_set, start_params=start_params)
+            arma_model.learn_model_params(train_set, start_params=np.array(start_params))
 
             if not IS_ONLINE:
                 predictions = arma_model.predict_using_learned_params(train_set, number_of_predictions_ahead)
@@ -95,7 +95,7 @@ def run_ar(logger):
 
 
 def run_ma(logger):
-    return run_arma(logger, (0, 1))
+    return run_arma(logger, (0, 1), MA_START_PARAMS)
 
 
 def run_arma(logger, order=None, start_params=None):
@@ -115,14 +115,14 @@ def run_arma(logger, order=None, start_params=None):
 
 
 def main(logger):
-    ar_metrics = run_ar(logger)
-    # ma_values = run_ma(logger)
+    # ar_metrics = run_ar(logger)
+    ma_values = run_ma(logger)
     # arma_values = run_arma(logger)
 
     # print values
     logger.log('-- avg. performance:')
-    utils.log_metrics_dict(logger, ar_metrics)
-    # utils.log_metrics_dict(logger, ma_values)
+    # utils.log_metrics_dict(logger, ar_metrics)
+    utils.log_metrics_dict(logger, ma_values)
 
     # logger.log('AR avg. performance: {ar_values}'.format(ar_values=ar_values))
     # logger.log('MA avg. performance: {ma_values}'.format(ma_values=ma_values))
