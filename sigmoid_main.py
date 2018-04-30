@@ -18,8 +18,8 @@ GRAPH_OUTPUT_FOLDER_PATH = 'output'
 SERIES_LENGTH = 25
 TEST_SIZE = 10
 IS_ONLINE = True
-LAG_SIZE = 2
-DATASET_SIZE = None
+LAG_SIZE = 5
+DATASET_SIZE = 500
 
 
 def calculate_dataset_mean_scores():
@@ -37,10 +37,11 @@ def calculate_dataset_mean_scores():
     # log hyper-parameters
     gamma_0 = 1e-3
     batch_size = 5
+    update_batch_size = 2
     lag = LAG_SIZE
-    initial_updates = 1000
-    online_updates = 500
-    gradient_size_target = 0.01
+    initial_updates = 2000
+    online_updates = 1000
+    gradient_size_target = 0.001
     logger.log('hyper parameters: '
                'lr={lr}, initial_updates={initial_updates}, online_updates={online_updates}, batch size={batch_size}, '
                'lag={lag}, gradient_size_target={gradient_size_target}'.format(
@@ -86,7 +87,9 @@ def calculate_dataset_mean_scores():
                 predictions.append(gd_fitter.predict(x_t))
 
                 if IS_ONLINE:
-                    online_update_log.append(gd_fitter.update(x_t, test_set[x_t], online_updates))
+                    gd_fitter.update_train_set(x_t, test_set[x_t])
+                    if ((t + 1) % update_batch_size) == 0:
+                        online_update_log.append(gd_fitter.update_model(online_updates, gamma=gamma_0/(t+1)))
 
         except Exception as ex:
             if 'nan prediction' in str(ex):
