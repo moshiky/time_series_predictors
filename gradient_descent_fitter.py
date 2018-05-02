@@ -19,8 +19,8 @@ class GradientDescentFitter:
     # evaluation plot mode
     PLOT_ALL = 0
     PLOT_RECENT = 1
-    RECENT_AMOUNT = 5
-    STOP_LEARNING_INTERVAL = 1e-3
+    RECENT_AMOUNT = 15
+    STOP_LEARNING_INTERVAL = 1e-5
 
     def __init__(self, logger, model_class, gamma_0, should_shuffle, initial_updates, batch_size, lag, gradient_size_target):
         self.__logger = logger
@@ -99,9 +99,10 @@ class GradientDescentFitter:
                 last_gradient_avg_sum_size = np.sqrt(np.sum(np.square(gradient_sum / self.__batch_size)))
                 gradient_log.append(last_gradient_avg_sum_size)
 
+                diff = 5
                 if len(gradient_log) > GradientDescentFitter.RECENT_AMOUNT:
-                    if abs(np.array(gradient_log[2-GradientDescentFitter.RECENT_AMOUNT:]).mean() \
-                        - np.array(gradient_log[-GradientDescentFitter.RECENT_AMOUNT:-2]).mean()) \
+                    if np.array(gradient_log[-GradientDescentFitter.RECENT_AMOUNT:-diff]).mean() \
+                        - np.array(gradient_log[-(GradientDescentFitter.RECENT_AMOUNT-diff):]).mean() \
                             < GradientDescentFitter.STOP_LEARNING_INTERVAL:
                         break
 
@@ -111,9 +112,9 @@ class GradientDescentFitter:
                 updates_so_far += 1
 
         # self.__logger.log('stopped at update: {updates}'.format(updates=updates_so_far))
-        if updates_so_far > 100:
-            plt.plot(gradient_log)
-            plt.show()
+        # if updates_so_far > 100:
+        #     plt.plot(gradient_log)
+        #     plt.show()
 
         return updates_so_far
 

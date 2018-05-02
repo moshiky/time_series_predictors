@@ -37,7 +37,7 @@ def calculate_dataset_mean_scores():
     # log hyper-parameters
     gamma_0 = 1e-3
     batch_size = 5
-    update_batch_size = 2
+    update_batch_size = 3
     lag = LAG_SIZE
     initial_updates = 2000
     online_updates = 1000
