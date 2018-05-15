@@ -19,7 +19,7 @@ SERIES_LENGTH = 25
 TEST_SIZE = 24
 IS_ONLINE = True
 LAG_SIZE = 5
-DATASET_SIZE = 500
+DATASET_SIZE = None
 
 
 def calculate_dataset_mean_scores():
@@ -35,7 +35,7 @@ def calculate_dataset_mean_scores():
     logger.log('loaded dataset size: {num_records}'.format(num_records=len(dataset)))
 
     # log hyper-parameters
-    gamma_0 = 5e-2
+    gamma_0 = 9e-2
     batch_size = 1
     update_batch_size = 1
     lag = LAG_SIZE
