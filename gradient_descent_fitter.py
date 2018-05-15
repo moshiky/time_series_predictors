@@ -54,7 +54,7 @@ class GradientDescentFitter:
 
         # extract x values
         x_values = list(self.__train_set.keys())
-        x_values = sorted(x_values)[-self.__lag:]
+        # x_values = sorted(x_values)[-self.__lag:]
 
         # apply gradient improvements
         gradient_sum = np.zeros(self.__w_vector.shape)
@@ -68,12 +68,13 @@ class GradientDescentFitter:
 
         while updates_so_far < max_updates and last_gradient_avg_sum_size > self.__gradient_size_target:
 
-            # select x_t
-            if self.__should_shuffle:
-                sample_index = np.random.randint(low=0, high=len(x_values))
-            else:
-                sample_index = (sample_index+1) % len(x_values)
-            x_t = x_values[sample_index]
+            # # select x_t
+            # if self.__should_shuffle:
+            #     sample_index = np.random.randint(low=0, high=len(x_values))
+            # else:
+            #     sample_index = (sample_index+1) % len(x_values)
+            # x_t = x_values[sample_index]
+            x_t = x_values[0]
 
             # get y_t
             y_t = self.__train_set[x_t]
@@ -125,6 +126,7 @@ class GradientDescentFitter:
         return predicted_value
 
     def update_train_set(self, new_x, new_y):
+        self.__train_set = dict()
         self.__train_set[new_x] = new_y
 
     def update_model(self, online_updates, gamma=None):

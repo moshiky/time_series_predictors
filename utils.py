@@ -149,17 +149,25 @@ def calc_mid_end_rate(data_records):
 
 
 def log_metrics_dict(logger, metrics):
+
+    metric_id = 1
+    total_metrics = len(metrics.keys())
+    pyplot.subplots(num=None, figsize=(15, 6), dpi=120, facecolor='w', edgecolor='k')
     for metric_name in sorted(metrics.keys(), reverse=True):
         if type(metrics[metric_name]) == list:
             m_sum = sum(metrics[metric_name])
             m_len = len(metrics[metric_name])
             logger.log('{key} : {metric_value}'.format(key=metric_name, metric_value=m_sum/m_len))
 
+            pyplot.subplot(100 + 10 * total_metrics + metric_id)
             pyplot.hist(metrics[metric_name], bins=100, log=True)
-            pyplot.show()
+            pyplot.title(metric_name)
+            metric_id += 1
 
         else:
             logger.log('{key} : {metric_value}'.format(key=metric_name, metric_value=metrics[metric_name]))
+
+    pyplot.show()
 
 
 def get_synthetic_sigmoid_ts(l_param, a_param, length, y_t0, add_noise=False, should_plot=False):

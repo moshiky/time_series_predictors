@@ -16,7 +16,7 @@ import sigmoid_functions_v3
 H_INDEX_CSV_FILE_PATH = r'datasets/author_h_index.csv'
 GRAPH_OUTPUT_FOLDER_PATH = 'output'
 SERIES_LENGTH = 25
-TEST_SIZE = 10
+TEST_SIZE = 24
 IS_ONLINE = True
 LAG_SIZE = 5
 DATASET_SIZE = 500
@@ -35,12 +35,12 @@ def calculate_dataset_mean_scores():
     logger.log('loaded dataset size: {num_records}'.format(num_records=len(dataset)))
 
     # log hyper-parameters
-    gamma_0 = 1e-3
-    batch_size = 5
-    update_batch_size = 3
+    gamma_0 = 5e-2
+    batch_size = 1
+    update_batch_size = 1
     lag = LAG_SIZE
-    initial_updates = 2000
-    online_updates = 1000
+    initial_updates = 1
+    online_updates = 1
     gradient_size_target = 0.001
     logger.log('hyper parameters: '
                'lr={lr}, initial_updates={initial_updates}, online_updates={online_updates}, batch size={batch_size}, '
@@ -97,9 +97,14 @@ def calculate_dataset_mean_scores():
             else:
                 raise ex
 
+        # plt.plot([y[1] for y in list(sorted(test_set.items(), key=lambda it: it[0]))], color='r')
+        # plt.plot(predictions, color='b')
+        # plt.show()
+
         # calculate error
         try:
             error_metrics = utils.get_all_metrics(sorted(test_set.values())[:TEST_SIZE], predictions)
+            # print(error_metrics)
         except Exception as ex:
             if 'bad prediction' in str(ex):
                 continue
@@ -124,9 +129,9 @@ def calculate_dataset_mean_scores():
     logger.log('total time: {total_time} secs'.format(total_time=time.time()-start_time))
     logger.log('valid samples: {valid}'.format(valid=len(metrics_storage[list(metrics_storage.keys())[0]])))
 
-    for x in [initial_update_log, online_update_log]:
-        plt.hist(x, log=True, bins=100)
-        plt.show()
+    # for x in [initial_update_log, online_update_log]:
+    #     plt.hist(x, log=True, bins=100)
+    #     plt.show()
 
     # log average error
     utils.log_metrics_dict(logger, metrics_storage)
