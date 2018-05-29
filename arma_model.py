@@ -33,7 +33,7 @@ class ARMAModel:
             self.__train_set = train_set
 
         # validate data
-        if len(set(self.__train_set)) == 1:
+        if len(self.__train_set) > 1 and len(set(self.__train_set)) == 1:
             raise Exception("Can't fit model since all history values are the same")
 
         # create model instance

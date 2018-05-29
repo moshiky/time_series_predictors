@@ -9,8 +9,8 @@ import time
 
 DATASET_FILE_PATH = r'datasets/author_h_index.csv'
 LAG_SIZE = 5
-INITIAL_HISTORY_SIZE = 15
-NUMBER_OF_PREDICTIONS_AHEAD = 10
+INITIAL_HISTORY_SIZE = 3
+NUMBER_OF_PREDICTIONS_AHEAD = 22
 LOGGING_INTERVAL = 100
 SHOULD_PLOT = False
 IS_ONLINE = True
@@ -115,14 +115,14 @@ def run_arma(logger, order=None, start_params=None):
 
 
 def main(logger):
-    # ar_metrics = run_ar(logger)
-    ma_values = run_ma(logger)
+    ar_metrics = run_ar(logger)
+    # ma_values = run_ma(logger)
     # arma_values = run_arma(logger)
 
     # print values
     logger.log('-- avg. performance:')
-    # utils.log_metrics_dict(logger, ar_metrics)
-    utils.log_metrics_dict(logger, ma_values)
+    utils.log_metrics_dict(logger, ar_metrics)
+    # utils.log_metrics_dict(logger, ma_values)
 
     # logger.log('AR avg. performance: {ar_values}'.format(ar_values=ar_values))
     # logger.log('MA avg. performance: {ma_values}'.format(ma_values=ma_values))

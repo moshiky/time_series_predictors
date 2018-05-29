@@ -10,7 +10,8 @@ import utils
 from graph_manager import GraphManager
 from statistics_manager import StatisticsManager
 # import sigmoid_functions_v2
-import sigmoid_functions_v3
+# import sigmoid_functions_v3
+import sigmoid_functions_v4
 
 
 H_INDEX_CSV_FILE_PATH = r'datasets/author_h_index.csv'
@@ -35,7 +36,7 @@ def calculate_dataset_mean_scores():
     logger.log('loaded dataset size: {num_records}'.format(num_records=len(dataset)))
 
     # log hyper-parameters
-    gamma_0 = 9e-2
+    gamma_0 = 5e-2
     batch_size = 1
     update_batch_size = 1
     lag = LAG_SIZE
@@ -66,7 +67,7 @@ def calculate_dataset_mean_scores():
         gd_fitter = \
             GradientDescentFitter(
                 logger,
-                sigmoid_functions_v3.SigmoidV3,
+                sigmoid_functions_v4.SigmoidV4,
                 gamma_0=gamma_0,
                 should_shuffle=True,
                 initial_updates=initial_updates,
@@ -97,9 +98,10 @@ def calculate_dataset_mean_scores():
             else:
                 raise ex
 
-        # plt.plot([y[1] for y in list(sorted(test_set.items(), key=lambda it: it[0]))], color='r')
-        # plt.plot(predictions, color='b')
-        # plt.show()
+        plt.plot([y[1] for y in list(sorted(test_set.items(), key=lambda it: it[0]))], color='r')
+        plt.plot(predictions, color='b')
+        print(gd_fitter.get_w())
+        plt.show()
 
         # calculate error
         try:
